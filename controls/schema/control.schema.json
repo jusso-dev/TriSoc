@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://attestor.trisoc.io/schemas/control-v1.json",
+  "title": "TriSOC Attestor Control v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "attestor.trisoc.io/v1"},
+    "kind": {"const": "Control"},
+    "metadata": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "title", "vendor", "product", "service", "version", "status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)+$"},
+        "title": {"type": "string", "minLength": 1},
+        "vendor": {"enum": ["microsoft", "aws", "google"]},
+        "product": {"type": "string", "minLength": 1},
+        "service": {"type": "string", "minLength": 1},
+        "version": {"type": "string"},
+        "status": {"enum": ["draft", "active", "deprecated", "superseded", "disabled_by_organisation_policy"]},
+        "tags": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "supersedingControlId": {"type": "string"}
+      }
+    },
+    "spec": {
+      "type": "object", "additionalProperties": false,
+      "required": ["classification", "severity", "scopes", "source", "requiredPermissions", "expected", "collector", "evaluator", "explanation", "remediation", "evidence", "maximumEvidenceAge"],
+      "properties": {
+        "classification": {"enum": ["vendor_required", "vendor_recommended", "architectural_recommendation", "organisation_policy", "optional_optimisation"]},
+        "severity": {"enum": ["critical", "high", "medium", "low", "informational"]},
+        "scopes": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "applicability": {"$ref": "#/$defs/applicability"},
+        "source": {"$ref": "#/$defs/source"},
+        "requiredPermissions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "expected": {"type": "object", "minProperties": 1},
+        "collector": {"$ref": "#/$defs/collector"},
+        "evaluator": {"$ref": "#/$defs/evaluator"},
+        "explanation": {"$ref": "#/$defs/explanation"},
+        "remediation": {"$ref": "#/$defs/remediation"},
+        "evidence": {"$ref": "#/$defs/evidence"},
+        "maximumEvidenceAge": {"type": "string", "pattern": "^[1-9][0-9]*(s|m|h|d)$"},
+        "references": {"type": "array", "items": {"$ref": "#/$defs/reference"}},
+        "drift": {"$ref": "#/$defs/drift"}
+      }
+    }
+  },
+  "$defs": {
+    "condition": {"type": "object", "additionalProperties": false, "required": ["field", "operator"], "properties": {"field": {"type": "string"}, "operator": {"enum": ["equals", "notEquals", "greaterThan", "lessThan", "contains", "in", "exists"]}, "value": {}}},
+    "applicability": {"type": "object", "additionalProperties": false, "properties": {"all": {"type": "array", "items": {"$ref": "#/$defs/condition"}}, "any": {"type": "array", "items": {"$ref": "#/$defs/condition"}}}},
+    "source": {"type": "object", "additionalProperties": false, "required": ["title", "url", "retrievedAt", "contentHash"], "properties": {"vendorControlId": {"type": "string"}, "title": {"type": "string"}, "url": {"type": "string", "format": "uri", "pattern": "^https://"}, "publishedAt": {"type": "string", "format": "date-time"}, "retrievedAt": {"type": "string", "format": "date-time"}, "version": {"type": "string"}, "contentHash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}}},
+    "collector": {"type": "object", "additionalProperties": false, "required": ["provider", "operation"], "properties": {"provider": {"enum": ["microsoft", "aws", "google"]}, "operation": {"type": "string"}, "parameters": {"type": "object"}}},
+    "evaluator": {"type": "object", "additionalProperties": false, "required": ["type", "expression"], "properties": {"type": {"const": "cel"}, "expression": {"type": "string", "minLength": 1}}},
+    "explanation": {"type": "object", "additionalProperties": false, "required": ["technical", "plainEnglish"], "properties": {"technical": {"type": "string", "minLength": 40}, "plainEnglish": {"type": "string", "minLength": 40}}},
+    "remediation": {"type": "object", "additionalProperties": false, "required": ["risk", "automatic", "guidance", "costImpact", "destructive"], "properties": {"risk": {"enum": ["low", "medium", "high", "destructive"]}, "automatic": {"enum": ["unsupported", "manual_guidance", "generate_iac", "supported_with_approval"]}, "planGenerator": {"type": "string"}, "guidance": {"type": "string"}, "costImpact": {"enum": ["none", "low", "usage_dependent", "potentially_significant", "unknown_review_required"]}, "destructive": {"type": "boolean"}}},
+    "evidence": {"type": "object", "additionalProperties": false, "required": ["requiredFields"], "properties": {"requiredFields": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "redact": {"type": "array", "items": {"type": "string"}}}},
+    "reference": {"type": "object", "additionalProperties": false, "required": ["title", "url"], "properties": {"title": {"type": "string"}, "url": {"type": "string", "format": "uri", "pattern": "^https://"}}},
+    "drift": {"type": "object", "additionalProperties": false, "properties": {"compare": {"type": "array", "items": {"type": "string"}}, "ignore": {"type": "array", "items": {"type": "string"}}}}
+  }
+}

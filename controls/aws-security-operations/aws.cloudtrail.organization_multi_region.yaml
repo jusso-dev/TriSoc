@@ -1,0 +1,93 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: aws.cloudtrail.organization_multi_region
+  title: CloudTrail uses an organisation-wide multi-Region trail
+  vendor: aws
+  product: cloudtrail
+  service: trails
+  version: 1.0.0
+  status: active
+  tags: [logging, detection, foundational]
+spec:
+  classification: vendor_recommended
+  severity: high
+  scopes: [organization]
+  applicability:
+    all:
+      - field: environment.accountCount
+        operator: greaterThan
+        value: 1
+  source:
+    title: Creating a trail for an organization
+    url: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/creating-trail-organization.html
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:4210d0e1ac13294428e19fa98de74dd2ad8f193a000460d9086239e63655f2bb
+  requiredPermissions:
+    - cloudtrail:DescribeTrails
+    - cloudtrail:GetEventSelectors
+    - cloudtrail:GetTrailStatus
+    - organizations:DescribeOrganization
+  expected:
+    organizationTrail: true
+    multiRegion: true
+    logging: true
+    managementEvents:
+      read: true
+      write: true
+  collector:
+    provider: aws
+    operation: cloudtrail.describeTrails
+    parameters:
+      includeShadowTrails: false
+  evaluator:
+    type: cel
+    expression: >-
+      evidence.trails.exists(t,
+        t.organizationTrail == true &&
+        t.multiRegion == true &&
+        t.logging == true &&
+        t.managementRead == true &&
+        t.managementWrite == true)
+  explanation:
+    technical: >-
+      The governed AWS organisation lacks a running organisation trail that
+      covers all enabled Regions and records read and write management events.
+    plainEnglish: >-
+      Activity in some AWS accounts or Regions might be absent from the central
+      security audit trail, reducing investigation and detection visibility.
+  remediation:
+    risk: medium
+    automatic: generate_iac
+    planGenerator: aws.cloudtrail.organization_trail
+    guidance: >-
+      Review a plan for an organisation-wide multi-Region trail, confirm its
+      encrypted log archive destination, and validate delivery before approval.
+    costImpact: usage_dependent
+    destructive: false
+  evidence:
+    requiredFields:
+      - organizationId
+      - collectorAccountId
+      - trails[].trailArn
+      - trails[].organizationTrail
+      - trails[].multiRegion
+      - trails[].logging
+      - trails[].managementRead
+      - trails[].managementWrite
+    redact:
+      - trails[].snsTopicArn
+  maximumEvidenceAge: 24h
+  references:
+    - title: Security Hub CSPM controls for AWS CloudTrail
+      url: https://docs.aws.amazon.com/securityhub/latest/userguide/cloudtrail-controls.html
+  drift:
+    compare:
+      - trails[].organizationTrail
+      - trails[].multiRegion
+      - trails[].logging
+      - trails[].managementRead
+      - trails[].managementWrite
+    ignore:
+      - trails[].latestDeliveryTime
+

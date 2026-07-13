@@ -1,0 +1,80 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: google.logging.organization_sink
+  title: Organisation audit logs are routed through an aggregated sink
+  vendor: google
+  product: security-operations
+  service: cloud-logging
+  version: 1.0.0
+  status: active
+  tags: [logging, audit, ingestion]
+spec:
+  classification: vendor_recommended
+  severity: high
+  scopes: [organization]
+  applicability:
+    all:
+      - field: environment.googleSecOps.enabled
+        operator: equals
+        value: true
+  source:
+    title: Aggregated sinks overview
+    url: https://docs.cloud.google.com/logging/docs/export/aggregated_sinks_overview
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:4bf4265c355b8eced129c02df8ccaf01091308486b8ff8844f1efdc130cc03a6
+  requiredPermissions:
+    - logging.sinks.list
+    - logging.sinks.get
+    - resourcemanager.organizations.get
+  expected:
+    organizationSinkPresent: true
+    includesChildren: true
+    auditLogsIncluded: true
+    destinationReachable: true
+  collector:
+    provider: google
+    operation: logging.organizations.sinks.list
+  evaluator:
+    type: cel
+    expression: >-
+      evidence.sinks.exists(s,
+        s.disabled == false &&
+        s.includeChildren == true &&
+        s.auditLogsIncluded == true &&
+        s.destinationReachable == true)
+  explanation:
+    technical: >-
+      No active organisation-level aggregated sink both includes child resources
+      and routes the required audit logs to a reachable approved destination.
+    plainEnglish: >-
+      Important Google Cloud activity might not reach the central security
+      record, so investigations and detections can have avoidable blind spots.
+  remediation:
+    risk: medium
+    automatic: generate_iac
+    planGenerator: google.logging.organization_sink
+    guidance: >-
+      Create or repair an aggregated organisation sink with child inclusion,
+      grant its writer identity only the destination access it needs, and test delivery.
+    costImpact: usage_dependent
+    destructive: false
+  evidence:
+    requiredFields:
+      - organizationId
+      - sinks[].name
+      - sinks[].destination
+      - sinks[].disabled
+      - sinks[].includeChildren
+      - sinks[].auditLogsIncluded
+      - sinks[].destinationReachable
+  maximumEvidenceAge: 6h
+  drift:
+    compare:
+      - sinks[].destination
+      - sinks[].filter
+      - sinks[].disabled
+      - sinks[].includeChildren
+    ignore:
+      - sinks[].writerIdentity
+

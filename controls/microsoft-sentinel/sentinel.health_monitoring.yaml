@@ -1,0 +1,71 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: microsoft.sentinel.health_monitoring
+  title: Microsoft Sentinel health monitoring is enabled
+  vendor: microsoft
+  product: sentinel
+  service: health-monitoring
+  version: 1.0.0
+  status: active
+  tags: [health, audit, foundational]
+spec:
+  classification: vendor_required
+  severity: high
+  scopes: [workspace]
+  applicability:
+    all:
+      - field: environment.microsoftSentinel.enabled
+        operator: equals
+        value: true
+  source:
+    title: Turn on auditing and health monitoring in Microsoft Sentinel
+    url: https://learn.microsoft.com/en-us/azure/sentinel/enable-monitoring
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:1b1677a60a17ab0ce2f5569e88682856e615d0c093c6da9430ad8d6693b9bf30
+  requiredPermissions:
+    - Microsoft.Insights/diagnosticSettings/read
+    - Microsoft.OperationalInsights/workspaces/read
+    - Microsoft.SecurityInsights/operations/read
+  expected:
+    healthMonitoringEnabled: true
+    destinationIsSentinelWorkspace: true
+  collector:
+    provider: microsoft
+    operation: azure.monitor.diagnosticSettings.listByResource
+  evaluator:
+    type: cel
+    expression: >-
+      evidence.healthMonitoringEnabled == true &&
+      evidence.destinationIsSentinelWorkspace == true
+  explanation:
+    technical: >-
+      The Sentinel workspace does not have an active diagnostic configuration
+      that sends supported Sentinel resource health events to the workspace.
+    plainEnglish: >-
+      Sentinel cannot reliably report whether its connectors, rules, and
+      automation are healthy because health monitoring is not fully enabled.
+  remediation:
+    risk: low
+    automatic: generate_iac
+    planGenerator: microsoft.sentinel.health_monitoring
+    guidance: >-
+      Enable Sentinel auditing and health monitoring for the workspace, then
+      verify that SentinelHealth receives a newly generated health event.
+    costImpact: usage_dependent
+    destructive: false
+  evidence:
+    requiredFields:
+      - workspaceResourceId
+      - diagnosticSettingResourceId
+      - healthMonitoringEnabled
+      - destinationWorkspaceResourceId
+      - destinationIsSentinelWorkspace
+  maximumEvidenceAge: 1h
+  drift:
+    compare:
+      - healthMonitoringEnabled
+      - destinationWorkspaceResourceId
+    ignore:
+      - etag
+

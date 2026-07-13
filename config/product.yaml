@@ -1,0 +1,5 @@
+name: TriSOC Attestor
+description: Builds, validates and continuously attests multi-cloud security operations environments against vendor guidance.
+binary: trisoc
+controlApiGroup: attestor.trisoc.io
+
