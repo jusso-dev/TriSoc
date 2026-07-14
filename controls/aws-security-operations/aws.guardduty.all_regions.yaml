@@ -1,0 +1,44 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: aws.guardduty.all_regions
+  title: GuardDuty is enabled in every governed Region
+  vendor: aws
+  product: guardduty
+  service: detectors
+  version: 1.0.0
+  status: active
+  tags: [detection, threat-detection, regional]
+spec:
+  classification: vendor_recommended
+  severity: critical
+  scopes: [organization, region]
+  source:
+    title: Managing GuardDuty accounts with AWS Organizations
+    url: https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_organizations.html
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:0ddad1f54d5020fe54972ff9fb9136fba7fd2eed434380b8cedbb9cdbab71790
+  requiredPermissions: [guardduty:ListDetectors, guardduty:GetDetector]
+  expected:
+    enabledInAllGovernedRegions: true
+  collector:
+    provider: aws
+    operation: guardduty.listDetectors
+  evaluator:
+    type: cel
+    expression: evidence.guardDutyAllRegions == true
+  explanation:
+    technical: At least one governed AWS Region has no enabled GuardDuty detector.
+    plainEnglish: Threat monitoring is switched off in at least one Region, creating a blind spot for suspicious AWS activity.
+  remediation:
+    risk: medium
+    automatic: generate_iac
+    guidance: Review region coverage and GuardDuty protection-plan costs before enabling the missing detectors.
+    costImpact: usage_dependent
+    destructive: false
+  evidence:
+    requiredFields: [governedRegions, "guardDuty[].region", "guardDuty[].enabled"]
+  maximumEvidenceAge: 6h
+  drift:
+    compare: [guardDuty]
+    ignore: [observedAt]

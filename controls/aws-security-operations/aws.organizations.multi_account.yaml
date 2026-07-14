@@ -1,0 +1,45 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: aws.organizations.multi_account
+  title: Governed accounts are managed in one AWS organization
+  vendor: aws
+  product: organizations
+  service: accounts
+  version: 1.0.0
+  status: active
+  tags: [architecture, foundational, governance]
+spec:
+  classification: vendor_recommended
+  severity: high
+  scopes: [organization]
+  source:
+    title: Best practices for a multi-account environment
+    url: https://docs.aws.amazon.com/organizations/latest/userguide/orgs_best-practices.html
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:f3490cee1b0cdcb038bdd3e66aa95740ee8860c182d782c19f14e60938b7e44f
+  requiredPermissions: [organizations:DescribeOrganization, organizations:ListAccounts]
+  expected:
+    organizationEnabled: true
+    minimumAccounts: 2
+  collector:
+    provider: aws
+    operation: organizations.describeOrganization
+  evaluator:
+    type: cel
+    expression: evidence.organization.enabled == true && evidence.organization.accountCount > 1
+  explanation:
+    technical: The assessed estate is not represented by an active AWS Organization containing multiple governed accounts.
+    plainEnglish: AWS accounts are not being managed through the expected central organization, so security settings may be applied inconsistently.
+  remediation:
+    risk: high
+    automatic: manual_guidance
+    guidance: Design the account structure and migration with qualified AWS architects; do not move accounts automatically.
+    costImpact: unknown_review_required
+    destructive: false
+  evidence:
+    requiredFields: [organization.id, organization.accountCount, collectorIdentity]
+  maximumEvidenceAge: 7d
+  drift:
+    compare: [organization.id, organization.managementAccountId, organization.accountCount]
+    ignore: [observedAt]

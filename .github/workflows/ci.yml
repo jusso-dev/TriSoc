@@ -22,13 +22,18 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
       - name: Verify formatting
-        run: test -z "$(gofmt -l cmd internal)"
+        run: test -z "$(gofmt -l cmd internal providers)"
       - name: Test with race detector
         run: go test -race -coverprofile=coverage.out ./...
       - name: Static analysis
         run: go vet ./...
       - name: Validate bundled controls
         run: go run ./cmd/trisoc controls validate controls --output json
+      - name: Validate AWS CloudFormation
+        run: |
+          pipx install cfn-lint==1.46.0
+          go run ./cmd/trisoc aws plan --trail-name trisoc-organization-trail --output cloudformation > generated-aws-plan.json
+          cfn-lint deploy/cloudformation/aws-attestor-assessment-role.yaml generated-aws-plan.json
       - name: Validate Compose
         run: docker compose config --quiet
       - name: Build container
@@ -68,4 +73,3 @@ jobs:
           languages: go
       - name: Analyse
         uses: github/codeql-action/analyze@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4
-

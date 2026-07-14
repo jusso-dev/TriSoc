@@ -6,7 +6,7 @@ metadata:
   vendor: aws
   product: cloudtrail
   service: trails
-  version: 1.0.0
+  version: 1.1.0
   status: active
   tags: [logging, detection, foundational]
 spec:
@@ -15,14 +15,15 @@ spec:
   scopes: [organization]
   applicability:
     all:
-      - field: environment.accountCount
+      - field: organization.accountCount
         operator: greaterThan
         value: 1
   source:
-    title: Creating a trail for an organization
-    url: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/creating-trail-organization.html
+    vendorControlId: CloudTrail.1
+    title: Security Hub CSPM controls for AWS CloudTrail
+    url: https://docs.aws.amazon.com/securityhub/latest/userguide/cloudtrail-controls.html
     retrievedAt: 2026-07-14T00:00:00Z
-    contentHash: sha256:4210d0e1ac13294428e19fa98de74dd2ad8f193a000460d9086239e63655f2bb
+    contentHash: sha256:931773945e2f6aeaaf8e61a3963c301ebe80c61d205ee2a7b53cd06dbf296e56
   requiredPermissions:
     - cloudtrail:DescribeTrails
     - cloudtrail:GetEventSelectors
@@ -67,9 +68,9 @@ spec:
     destructive: false
   evidence:
     requiredFields:
-      - organizationId
-      - collectorAccountId
-      - trails[].trailArn
+      - organization.id
+      - callerAccountId
+      - trails[].arn
       - trails[].organizationTrail
       - trails[].multiRegion
       - trails[].logging
@@ -90,4 +91,3 @@ spec:
       - trails[].managementWrite
     ignore:
       - trails[].latestDeliveryTime
-

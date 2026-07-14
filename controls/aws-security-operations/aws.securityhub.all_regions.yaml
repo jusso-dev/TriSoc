@@ -1,0 +1,44 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: aws.securityhub.all_regions
+  title: Security Hub CSPM is enabled in every governed Region
+  vendor: aws
+  product: securityhub
+  service: hub
+  version: 1.0.0
+  status: active
+  tags: [posture, findings, regional]
+spec:
+  classification: vendor_recommended
+  severity: high
+  scopes: [organization, region]
+  source:
+    title: Understanding central configuration in Security Hub CSPM
+    url: https://docs.aws.amazon.com/securityhub/latest/userguide/central-configuration-intro.html
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:5a415c4078762a88b0f9552a1462832c806250b23986895d148a09c5ef8766d8
+  requiredPermissions: [securityhub:DescribeHub]
+  expected:
+    enabledInAllGovernedRegions: true
+  collector:
+    provider: aws
+    operation: securityhub.describeHub
+  evaluator:
+    type: cel
+    expression: evidence.securityHubAllRegions == true
+  explanation:
+    technical: Security Hub CSPM is not enabled in at least one governed Region.
+    plainEnglish: Security findings and posture checks are missing from at least one Region, reducing central visibility.
+  remediation:
+    risk: medium
+    automatic: generate_iac
+    guidance: Review a central-configuration policy for all governed Regions and confirm standards before approval.
+    costImpact: usage_dependent
+    destructive: false
+  evidence:
+    requiredFields: [governedRegions, "securityHub[].region", "securityHub[].enabled"]
+  maximumEvidenceAge: 6h
+  drift:
+    compare: [securityHub]
+    ignore: [observedAt]

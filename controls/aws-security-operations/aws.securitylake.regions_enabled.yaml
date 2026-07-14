@@ -1,0 +1,49 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: aws.securitylake.regions_enabled
+  title: Security Lake is enabled in approved Regions
+  vendor: aws
+  product: securitylake
+  service: data-lakes
+  version: 1.0.0
+  status: active
+  tags: [logging, ocsf, data-lake]
+spec:
+  classification: organisation_policy
+  severity: high
+  scopes: [organization, region]
+  applicability:
+    all:
+      - field: securityLakeRequired
+        operator: equals
+        value: true
+  source:
+    title: Managing Regions in Security Lake
+    url: https://docs.aws.amazon.com/security-lake/latest/userguide/manage-regions.html
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:8db7c772d193f58748fd046963fd84c0896c9e169715e2c5f6216b5e10f29c5c
+  requiredPermissions: [securitylake:ListDataLakes]
+  expected:
+    enabledInAllGovernedRegions: true
+  collector:
+    provider: aws
+    operation: securitylake.listDataLakes
+  evaluator:
+    type: cel
+    expression: evidence.securityLakeAllRegions == true
+  explanation:
+    technical: The baseline requires Security Lake, but at least one governed Region has no completed data lake.
+    plainEnglish: Central OCSF security data is not being collected in every approved Region, leaving a logging blind spot.
+  remediation:
+    risk: high
+    automatic: manual_guidance
+    guidance: Review source, lifecycle, encryption, rollup, and subscriber design plus storage and query costs before enabling a Region.
+    costImpact: potentially_significant
+    destructive: false
+  evidence:
+    requiredFields: [governedRegions, "securityLakes[].region", "securityLakes[].enabled"]
+  maximumEvidenceAge: 24h
+  drift:
+    compare: [securityLakes]
+    ignore: [observedAt]

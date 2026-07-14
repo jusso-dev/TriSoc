@@ -1,0 +1,61 @@
+{
+  "provider": "aws",
+  "callerAccountId": "111122223333",
+  "collectorIdentity": "arn:aws:sts::111122223333:assumed-role/TriSOCAttestorReadOnly/test",
+  "organization": {
+    "id": "o-example123456",
+    "managementAccountId": "111122223333",
+    "accountCount": 4,
+    "enabled": true
+  },
+  "homeRegion": "ap-southeast-2",
+  "governedRegions": ["ap-southeast-2", "us-east-1"],
+  "architecture": "full_aws_native_soc",
+  "delegatedAdministratorsRequired": true,
+  "guardDuty": [
+    {"region": "ap-southeast-2", "enabled": true, "status": "ENABLED", "id": "detector-a"},
+    {"region": "us-east-1", "enabled": true, "status": "ENABLED", "id": "detector-b"}
+  ],
+  "guardDutyAllRegions": true,
+  "guardDutyDelegatedAdministrator": true,
+  "securityHub": [
+    {"region": "ap-southeast-2", "enabled": true, "status": "ENABLED", "id": "arn:aws:securityhub:ap-southeast-2:111122223333:hub/default"},
+    {"region": "us-east-1", "enabled": true, "status": "ENABLED", "id": "arn:aws:securityhub:us-east-1:111122223333:hub/default"}
+  ],
+  "securityHubAllRegions": true,
+  "securityHubDelegatedAdministrator": true,
+  "enabledSecurityHubStandards": [
+    "arn:aws:securityhub:ap-southeast-2::standards/aws-foundational-security-best-practices/v/1.0.0",
+    "arn:aws:securityhub:us-east-1::standards/aws-foundational-security-best-practices/v/1.0.0"
+  ],
+  "requiredSecurityHubStandards": ["aws-foundational-security-best-practices"],
+  "requiredSecurityHubStandardsConfigured": true,
+  "requiredSecurityHubStandardsPresent": true,
+  "trails": [
+    {
+      "arn": "arn:aws:cloudtrail:ap-southeast-2:111122223333:trail/organization-trail",
+      "name": "organization-trail",
+      "homeRegion": "ap-southeast-2",
+      "organizationTrail": true,
+      "multiRegion": true,
+      "logging": true,
+      "managementRead": true,
+      "managementWrite": true,
+      "logFileValidation": true,
+      "kmsEncrypted": true
+    }
+  ],
+  "configRecorders": [
+    {"region": "ap-southeast-2", "name": "default", "recording": true, "lastStatus": "SUCCESS"},
+    {"region": "us-east-1", "name": "default", "recording": true, "lastStatus": "SUCCESS"}
+  ],
+  "configRecordersAllRegions": true,
+  "securityLakes": [
+    {"region": "ap-southeast-2", "enabled": true, "encryption": "alias/security-lake", "lifecycleConfigured": true},
+    {"region": "us-east-1", "enabled": true, "encryption": "alias/security-lake", "lifecycleConfigured": true}
+  ],
+  "securityLakeRequired": true,
+  "securityLakeAllRegions": true,
+  "openSearchDomains": [],
+  "observedAt": "2026-07-14T01:00:00Z"
+}

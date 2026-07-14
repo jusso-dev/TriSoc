@@ -1,0 +1,45 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: aws.cloudtrail.log_file_validation
+  title: The organization CloudTrail validates log-file integrity
+  vendor: aws
+  product: cloudtrail
+  service: trails
+  version: 1.0.0
+  status: active
+  tags: [logging, integrity, foundational]
+spec:
+  classification: vendor_recommended
+  severity: medium
+  scopes: [organization]
+  source:
+    vendorControlId: CloudTrail.4
+    title: Security Hub CSPM controls for AWS CloudTrail
+    url: https://docs.aws.amazon.com/securityhub/latest/userguide/cloudtrail-controls.html
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:931773945e2f6aeaaf8e61a3963c301ebe80c61d205ee2a7b53cd06dbf296e56
+  requiredPermissions: [cloudtrail:DescribeTrails, cloudtrail:GetTrailStatus]
+  expected:
+    logFileValidation: true
+  collector:
+    provider: aws
+    operation: cloudtrail.describeTrails
+  evaluator:
+    type: cel
+    expression: evidence.trails.exists(t, t.organizationTrail == true && t.multiRegion == true && t.logging == true && t.logFileValidation == true)
+  explanation:
+    technical: No running organization-wide multi-Region trail has log-file integrity validation enabled.
+    plainEnglish: AWS is not producing signed digest files for the central audit trail, making later tampering harder to identify.
+  remediation:
+    risk: low
+    automatic: generate_iac
+    guidance: Enable log-file validation on the approved organization trail and verify digest delivery.
+    costImpact: none
+    destructive: false
+  evidence:
+    requiredFields: ["trails[].arn", "trails[].logging", "trails[].logFileValidation"]
+  maximumEvidenceAge: 24h
+  drift:
+    compare: ["trails[].logFileValidation"]
+    ignore: [observedAt]

@@ -14,6 +14,14 @@ permissions documented in `PROVIDER_PERMISSIONS.md`; planning makes no cloud
 change. Unknown arguments are rejected and collection calls have a two-minute
 deadline.
 
+AWS adds `discover_aws_security_operations`,
+`run_aws_security_operations_attestation`, and
+`generate_aws_cloudformation`. Region lists are capped at 40, standards at 50,
+and OpenSearch APIs are called only for `security_lake_with_opensearch` or
+`full_aws_native_soc`. The MCP schema deliberately has no external-ID or static
+credential field; configure those through the local AWS shared profile or
+workload identity. AWS calls have a three-minute deadline.
+
 For local HTTP:
 
 ```sh

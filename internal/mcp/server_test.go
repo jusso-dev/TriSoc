@@ -41,7 +41,7 @@ func TestStdioInitializeAndListTools(t *testing.T) {
 		t.Fatal(err)
 	}
 	tools := listed["result"].(map[string]any)["tools"].([]any)
-	if len(tools) != 6 {
+	if len(tools) != 9 {
 		t.Fatalf("tools=%d", len(tools))
 	}
 }
@@ -70,6 +70,25 @@ func TestWriteToolDoesNotExist(t *testing.T) {
 	_, err := server.callTool(toolCall{Name: "apply_approved_plan", Arguments: json.RawMessage(`{}`)})
 	if err == nil {
 		t.Fatal("write tool unexpectedly available")
+	}
+}
+
+func TestAWSCloudFormationToolIsPlanningOnly(t *testing.T) {
+	server := New(&control.Store{}, nil)
+	value, err := server.callTool(toolCall{Name: "generate_aws_cloudformation", Arguments: json.RawMessage(`{"trailName":"trisoc-test-trail"}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "AWS::CloudTrail::Trail") || strings.Contains(string(raw), "SecretAccessKey") {
+		t.Fatalf("unsafe or incomplete plan: %s", raw)
+	}
+	schema, _ := json.Marshal(awsToolSchema())
+	if strings.Contains(string(schema), "externalId") || strings.Contains(string(schema), "accessKey") {
+		t.Fatalf("credential-like input exposed by MCP: %s", schema)
 	}
 }
 

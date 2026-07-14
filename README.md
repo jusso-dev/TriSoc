@@ -4,10 +4,11 @@ TriSOC Attestor builds, validates and continuously attests Microsoft Sentinel,
 AWS-native security operations, and Google Security Operations environments
 against reviewed vendor guidance.
 
-The foundation and Microsoft Sentinel provider are implemented: strict versioned
-controls, canonical PostgreSQL schema, redacted evidence hashing, Azure SDK-backed
-read-only discovery, deterministic attestation, drift comparison, Bicep planning,
-CLI workflows, and local MCP tools. AWS and Google provider phases follow.
+The foundation, Microsoft Sentinel provider, and AWS-native security operations
+provider are implemented: strict versioned controls, canonical PostgreSQL schema,
+redacted evidence hashing, real vendor SDK-backed read-only discovery,
+deterministic attestation, drift comparison, reviewable IaC planning, CLI
+workflows, and local MCP tools. Google provider support follows in phase 4.
 
 > TriSOC Attestor assists with deployment and continuous attestation. It does
 > not guarantee security, replace incident response, or replace qualified cloud
@@ -17,19 +18,22 @@ CLI workflows, and local MCP tools. AWS and Google provider phases follow.
 
 - Strict YAML decoding and deterministic validation of control metadata,
   official source domains, lifecycles, remediation safety, and CEL expressions.
-- Ten active Microsoft Sentinel control IDs plus reviewed AWS and Google examples.
+- Ten active Microsoft Sentinel controls and ten active AWS-native security
+  operations controls, plus a reviewed Google example.
 - Recursive sensitive-value redaction followed by deterministic SHA-256
   evidence hashing.
 - PostgreSQL schema covering organisations, immutable assessments and evidence,
   drift, findings, telemetry, detections, approvals, exceptions, and audit data.
 - CLI control validation with human, JSON, and YAML output.
 - MCP over stdio and stateless Streamable HTTP with control catalogue tools and
-  read-only Sentinel discovery, attestation, and Bicep planning.
-- Official Azure SDK integration for workspace, Sentinel, and Log Analytics APIs.
+  read-only Sentinel/AWS discovery and attestation plus Bicep/CloudFormation planning.
+- Official Azure and AWS SDK integrations. AWS covers Organizations, GuardDuty,
+  Security Hub CSPM, CloudTrail, Config, optional Security Lake, and optional
+  OpenSearch inventory selected only by architecture.
 - Loopback-only networking by default, bounded MCP inputs and outputs, and no
   write tools in the first release slice.
 
-AWS/Google discovery, remediation application, scheduling, reports, and the
+Google discovery, remediation application, scheduling, reports, and the
 management UI are explicitly roadmap work—not mock implementations.
 
 ## Architecture
@@ -41,7 +45,7 @@ flowchart LR
   API --> Core
   Scheduler[Worker and scheduler - planned] --> Core
   Core --> AZ[Microsoft collectors - phase 2]
-  Core --> AWS[AWS collectors - phase 3]
+  Core --> AWS[AWS collectors - phase 3 complete]
   Core --> GCP[Google collectors - phase 4]
   Core --> DB[(PostgreSQL append-only evidence)]
   Core --> Plans[Reviewable IaC plans]
@@ -81,6 +85,15 @@ trisoc azure discover --subscription ID --resource-group RG --workspace NAME --o
 trisoc azure attest --subscription ID --resource-group RG --workspace NAME --expected-tables SigninLogs,AuditLogs
 ```
 
+For AWS, select the architecture explicitly; OpenSearch is never assumed merely
+because AWS support is enabled:
+
+```sh
+trisoc aws discover --home-region ap-southeast-2 --regions ap-southeast-2,us-east-1 --architecture security_hub_findings_centric --output json
+trisoc aws attest --home-region ap-southeast-2 --regions ap-southeast-2,us-east-1 --require-delegated-admins --securityhub-standards aws-foundational-security-best-practices
+trisoc aws plan --trail-name trisoc-organization-trail --output cloudformation
+```
+
 Discovery and attestation are read-only. Evidence collection errors
 produce `unknown` or `error`, never `fail` or `pass`.
 
@@ -114,8 +127,9 @@ Example daily prompt for the completed product:
 > plain English. Do not apply remediation. Generate reviewable plans for
 > critical and high-severity findings.
 
-The current MCP server can inspect controls and assess one configured Sentinel
-workspace. Multi-environment daily orchestration remains phase 5 work.
+The current MCP server can inspect controls and assess an explicitly scoped
+Sentinel workspace or AWS security-operations estate. Multi-environment daily
+orchestration remains phase 5 work.
 
 ## Security model
 
@@ -138,17 +152,17 @@ Read [THREAT_MODEL.md](THREAT_MODEL.md), [SECURITY.md](SECURITY.md), and
 The initial examples are tied to official sources retrieved on 14 July 2026:
 
 - [Microsoft Sentinel auditing and health monitoring](https://learn.microsoft.com/en-us/azure/sentinel/enable-monitoring)
-- [AWS CloudTrail organisation trails](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/creating-trail-organization.html)
+- [AWS Security Hub CSPM controls for CloudTrail](https://docs.aws.amazon.com/securityhub/latest/userguide/cloudtrail-controls.html)
 - [Google Cloud aggregated logging sinks](https://docs.cloud.google.com/logging/docs/export/aggregated_sinks_overview)
 
-These are examples for the control-governance workflow, not a complete control
-pack. See [CONTROL_AUTHORING.md](CONTROL_AUTHORING.md).
+The shipped controls remain a deliberately bounded seed pack. See
+[CONTROL_AUTHORING.md](CONTROL_AUTHORING.md).
 
 ## Roadmap
 
 1. Foundation: this pull request scope.
 2. Microsoft Sentinel collectors and ten high-value controls.
-3. AWS Organizations and native security-operations collectors and controls.
+3. AWS Organizations and native security-operations collectors and controls: complete.
 4. Google Security Operations and Security Command Center collectors and controls.
 5. Scheduler, drift, signed bundles, exceptions, notifications, and reports.
 6. Accessible management interface and local authentication.
@@ -159,7 +173,10 @@ The proposed GitHub milestone and issue inventory is in [docs/ROADMAP.md](docs/R
 
 ## Limitations
 
-- AWS and Google provider APIs are not implemented yet.
+- Google provider APIs are not implemented yet.
+- AWS discovery currently assumes the executing or assumed role can read the
+  organization and configured Regions; member-account fan-out is the next AWS
+  expansion and inaccessible evidence is reported as unknown.
 - Sentinel currently targets one explicitly named workspace per command and does
   not persist the result to PostgreSQL; scheduled persistence begins in phase 5.
 - HTTP MCP is stateless and binds to loopback by default; a non-loopback native

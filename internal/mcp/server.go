@@ -19,6 +19,7 @@ import (
 
 	"github.com/trisoc/attestor/internal/attestation"
 	"github.com/trisoc/attestor/internal/control"
+	awsprovider "github.com/trisoc/attestor/providers/aws"
 	azureprovider "github.com/trisoc/attestor/providers/azure"
 )
 
@@ -323,6 +324,61 @@ func (s *Server) callTool(call toolCall) (any, error) {
 			results = append(results, result)
 		}
 		return map[string]any{"snapshot": snapshot, "results": results}, nil
+	case "discover_aws_security_operations", "run_aws_security_operations_attestation", "generate_aws_cloudformation":
+		var args awsToolArguments
+		if err := decodeStrict(call.Arguments, &args); err != nil {
+			return nil, err
+		}
+		if args.HomeRegion == "" {
+			args.HomeRegion = "us-east-1"
+		}
+		if len(args.GovernedRegions) == 0 {
+			args.GovernedRegions = []string{args.HomeRegion}
+		}
+		if args.Architecture == "" {
+			args.Architecture = string(awsprovider.SecurityHubFindingsCentric)
+		}
+		target := awsprovider.Target{Profile: args.Profile, RoleARN: args.RoleARN, HomeRegion: args.HomeRegion, GovernedRegions: args.GovernedRegions, Architecture: awsprovider.Architecture(args.Architecture), RequireDelegatedAdministrators: args.RequireDelegatedAdministrators, RequireSecurityLake: args.RequireSecurityLake, RequiredSecurityHubStandards: args.RequiredSecurityHubStandards}
+		if call.Name == "generate_aws_cloudformation" {
+			if args.TrailName == "" {
+				args.TrailName = "trisoc-organization-trail"
+			}
+			return awsprovider.GenerateCloudFormationPlan(args.TrailName)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+		defer cancel()
+		api, err := awsprovider.NewDefaultAPI(ctx, target)
+		if err != nil {
+			return nil, err
+		}
+		snapshot, collectionErr := awsprovider.NewCollector(api).Discover(ctx, target)
+		if call.Name == "discover_aws_security_operations" {
+			if collectionErr != nil {
+				return nil, collectionErr
+			}
+			return snapshot, nil
+		}
+		evaluator, err := attestation.New(serverVersion)
+		if err != nil {
+			return nil, err
+		}
+		controls := s.controls.LatestByVendor("aws")
+		results := make([]attestation.Result, 0, len(controls))
+		if collectionErr != nil {
+			observed := time.Now().UTC()
+			for _, c := range controls {
+				results = append(results, attestation.Unknown(c, observed, collectionErr))
+			}
+			return map[string]any{"collectionError": collectionErr.Error(), "results": results}, nil
+		}
+		for _, c := range controls {
+			result, evaluateErr := evaluator.Evaluate(c, snapshot, snapshot.ObservedAt)
+			if evaluateErr != nil {
+				result = attestation.Unknown(c, snapshot.ObservedAt, evaluateErr)
+			}
+			results = append(results, result)
+		}
+		return map[string]any{"snapshot": snapshot, "results": results}, nil
 	default:
 		return nil, fmt.Errorf("unknown tool %q", call.Name)
 	}
@@ -338,6 +394,18 @@ type azureToolArguments struct {
 	RequireAutomation    bool     `json:"requireAutomation"`
 }
 
+type awsToolArguments struct {
+	Profile                        string   `json:"profile"`
+	RoleARN                        string   `json:"roleArn"`
+	HomeRegion                     string   `json:"homeRegion"`
+	GovernedRegions                []string `json:"governedRegions"`
+	Architecture                   string   `json:"architecture"`
+	RequireDelegatedAdministrators bool     `json:"requireDelegatedAdministrators"`
+	RequireSecurityLake            bool     `json:"requireSecurityLake"`
+	RequiredSecurityHubStandards   []string `json:"requiredSecurityHubStandards"`
+	TrailName                      string   `json:"trailName"`
+}
+
 func toolDefinitions() []map[string]any {
 	readOnly := map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false}
 	return []map[string]any{
@@ -347,11 +415,19 @@ func toolDefinitions() []map[string]any {
 		{"name": "discover_microsoft_sentinel", "description": "Read-only cloud discovery: inspect one Microsoft Sentinel workspace using Azure SDK credentials. Requires workspace, onboarding state, connector, rule, automation and Log Analytics query read scopes.", "inputSchema": azureToolSchema(), "annotations": map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true}},
 		{"name": "run_microsoft_sentinel_attestation", "description": "Read-only assessment: discover and evaluate the latest Microsoft Sentinel control versions. Collection errors never become passes or failures.", "inputSchema": azureToolSchema(), "annotations": map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true}},
 		{"name": "generate_microsoft_sentinel_bicep", "description": "Planning only: generate reviewable Bicep for Sentinel onboarding and retention. Makes no cloud changes and has usage-dependent cost implications.", "inputSchema": azureToolSchema(), "annotations": readOnly},
+		{"name": "discover_aws_security_operations", "description": "Read-only cloud discovery: inspect AWS Organizations, GuardDuty, Security Hub CSPM, CloudTrail, Config, optional Security Lake, and explicitly selected OpenSearch resources. Requires the documented assessment role.", "inputSchema": awsToolSchema(), "annotations": map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true}},
+		{"name": "run_aws_security_operations_attestation", "description": "Read-only assessment: discover and evaluate the latest AWS-native security operations controls. Collection errors become unknown, never pass or fail.", "inputSchema": awsToolSchema(), "annotations": map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true}},
+		{"name": "generate_aws_cloudformation", "description": "Planning only: generate reviewable CloudFormation for an encrypted organization multi-Region CloudTrail. Makes no cloud changes and flags usage-dependent costs.", "inputSchema": awsToolSchema(), "annotations": readOnly},
 	}
 }
 
 func azureToolSchema() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{"subscriptionId": map[string]any{"type": "string"}, "resourceGroup": map[string]any{"type": "string"}, "workspaceName": map[string]any{"type": "string"}, "minimumRetentionDays": map[string]any{"type": "integer", "minimum": 30, "maximum": 730}, "requiredConnectors": map[string]any{"type": "array", "maxItems": 100, "items": map[string]any{"type": "string"}}, "expectedTables": map[string]any{"type": "array", "maxItems": 100, "items": map[string]any{"type": "string"}}, "requireAutomation": map[string]any{"type": "boolean"}}, "required": []string{"subscriptionId", "resourceGroup", "workspaceName"}, "additionalProperties": false}
+}
+
+func awsToolSchema() map[string]any {
+	architectures := []string{string(awsprovider.SecurityLakeOnly), string(awsprovider.SecurityLakeWithOpenSearch), string(awsprovider.SecurityHubFindingsCentric), string(awsprovider.ExistingThirdPartySIEMExport), string(awsprovider.FullAWSNativeSOC)}
+	return map[string]any{"type": "object", "properties": map[string]any{"profile": map[string]any{"type": "string", "maxLength": 128}, "roleArn": map[string]any{"type": "string", "maxLength": 2048}, "homeRegion": map[string]any{"type": "string", "maxLength": 64}, "governedRegions": map[string]any{"type": "array", "maxItems": 40, "uniqueItems": true, "items": map[string]any{"type": "string", "maxLength": 64}}, "architecture": map[string]any{"type": "string", "enum": architectures}, "requireDelegatedAdministrators": map[string]any{"type": "boolean"}, "requireSecurityLake": map[string]any{"type": "boolean"}, "requiredSecurityHubStandards": map[string]any{"type": "array", "maxItems": 50, "uniqueItems": true, "items": map[string]any{"type": "string", "maxLength": 512}}, "trailName": map[string]any{"type": "string", "minLength": 3, "maxLength": 128}}, "additionalProperties": false}
 }
 
 func toolResult(value any) map[string]any {

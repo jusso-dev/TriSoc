@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Read-only cross-account role for TriSOC Attestor assessment collectors.
+Parameters:
+  TrustedAssessmentAccountId:
+    Type: String
+    AllowedPattern: '^[0-9]{12}$'
+  ExternalId:
+    Type: String
+    NoEcho: true
+Resources:
+  AssessmentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: TriSOCAttestorAssessment
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub arn:${AWS::Partition}:iam::${TrustedAssessmentAccountId}:root
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref ExternalId
+      Policies:
+        - PolicyName: TriSOCAttestorReadOnly
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: CoreAssessment
+                Effect: Allow
+                Resource: '*'
+                Action:
+                  - sts:GetCallerIdentity
+                  - organizations:DescribeOrganization
+                  - organizations:ListAccounts
+                  - guardduty:ListDetectors
+                  - guardduty:GetDetector
+                  - guardduty:ListOrganizationAdminAccounts
+                  - securityhub:DescribeHub
+                  - securityhub:GetEnabledStandards
+                  - securityhub:ListOrganizationAdminAccounts
+                  - cloudtrail:DescribeTrails
+                  - cloudtrail:GetTrailStatus
+                  - cloudtrail:GetEventSelectors
+                  - config:DescribeConfigurationRecorderStatus
+                  - securitylake:ListDataLakes
+                  - es:ListDomainNames
+                  - es:DescribeDomainConfig
+Outputs:
+  RoleArn:
+    Value: !GetAtt AssessmentRole.Arn

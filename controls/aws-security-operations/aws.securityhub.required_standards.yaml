@@ -1,0 +1,49 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: aws.securityhub.required_standards
+  title: Required Security Hub CSPM standards are enabled
+  vendor: aws
+  product: securityhub
+  service: standards
+  version: 1.0.0
+  status: active
+  tags: [posture, controls, foundational]
+spec:
+  classification: organisation_policy
+  severity: high
+  scopes: [organization, region]
+  applicability:
+    all:
+      - field: requiredSecurityHubStandardsConfigured
+        operator: equals
+        value: true
+  source:
+    title: Enabling a security standard
+    url: https://docs.aws.amazon.com/securityhub/latest/userguide/enable-standards.html
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:9a639edfb0fe3cfd611e7a69ff30bab55b9f971e9a6d2ffe93e83d40d2972546
+  requiredPermissions: [securityhub:GetEnabledStandards]
+  expected:
+    baselineStandardsPresent: true
+  collector:
+    provider: aws
+    operation: securityhub.getEnabledStandards
+  evaluator:
+    type: cel
+    expression: evidence.requiredSecurityHubStandardsPresent == true
+  explanation:
+    technical: One or more Security Hub CSPM standards declared in the environment baseline are absent.
+    plainEnglish: An approved set of AWS security checks is not running, so some unsafe configurations may not produce findings.
+  remediation:
+    risk: medium
+    automatic: generate_iac
+    guidance: Review the missing standards and their AWS Config and finding-volume implications before enabling them.
+    costImpact: usage_dependent
+    destructive: false
+  evidence:
+    requiredFields: [requiredSecurityHubStandards, enabledSecurityHubStandards]
+  maximumEvidenceAge: 24h
+  drift:
+    compare: [enabledSecurityHubStandards]
+    ignore: [observedAt]

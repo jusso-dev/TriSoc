@@ -17,6 +17,7 @@ import (
 	"github.com/trisoc/attestor/internal/attestation"
 	"github.com/trisoc/attestor/internal/control"
 	"github.com/trisoc/attestor/internal/mcp"
+	awsprovider "github.com/trisoc/attestor/providers/aws"
 	azureprovider "github.com/trisoc/attestor/providers/azure"
 	"gopkg.in/yaml.v3"
 )
@@ -45,6 +46,8 @@ func run(args []string) error {
 		return mcpCommand(args[1:])
 	case "azure":
 		return azureCommand(args[1:])
+	case "aws":
+		return awsCommand(args[1:])
 	case "permissions":
 		return permissionsCommand(args[1:])
 	case "doctor":
@@ -272,10 +275,133 @@ func permissionsCommand(args []string) error {
 	for _, permission := range permissions {
 		controls := byPermission[permission]
 		sort.Strings(controls)
-		readOnly := strings.HasSuffix(strings.ToLower(permission), "/read") || strings.Contains(strings.ToLower(permission), "query/read") || strings.HasPrefix(permission, "logging.") && strings.HasSuffix(permission, ".get")
+		readOnly := isReadOnlyPermission(permission)
 		out = append(out, item{Permission: permission, Controls: controls, ReadOnly: readOnly, CapabilityLost: "Controls listed for this permission become unknown when it is omitted."})
 	}
 	return printValue(map[string]any{"provider": provider, "permissions": out}, format)
+}
+
+func isReadOnlyPermission(permission string) bool {
+	lower := strings.ToLower(permission)
+	if strings.HasSuffix(lower, "/read") || strings.Contains(lower, "query/read") || strings.HasPrefix(lower, "logging.") && strings.HasSuffix(lower, ".get") {
+		return true
+	}
+	if _, action, ok := strings.Cut(permission, ":"); ok {
+		return strings.HasPrefix(action, "Get") || strings.HasPrefix(action, "List") || strings.HasPrefix(action, "Describe") || strings.HasPrefix(action, "BatchGet")
+	}
+	return false
+}
+
+func awsCommand(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: trisoc aws discover|attest|plan [options]")
+	}
+	target, trailName, format, err := parseAWSTarget(args[1:])
+	if err != nil {
+		return err
+	}
+	if args[0] == "plan" {
+		plan, err := awsprovider.GenerateCloudFormationPlan(trailName)
+		if err != nil {
+			return err
+		}
+		if format == "cloudformation" {
+			fmt.Println(string(plan.Template))
+			return nil
+		}
+		return printValue(plan, format)
+	}
+	if args[0] != "discover" && args[0] != "attest" {
+		return fmt.Errorf("unknown aws command %q", args[0])
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	api, err := awsprovider.NewDefaultAPI(ctx, target)
+	if err != nil {
+		return err
+	}
+	snapshot, collectionErr := awsprovider.NewCollector(api).Discover(ctx, target)
+	if args[0] == "discover" {
+		if collectionErr != nil {
+			return collectionErr
+		}
+		return printValue(snapshot, format)
+	}
+	store, validation := control.LoadDefaultStore()
+	if !validation.Valid {
+		return fmt.Errorf("control catalogue is invalid: %v", validation.Issues)
+	}
+	evaluator, err := attestation.New(version)
+	if err != nil {
+		return err
+	}
+	controls := store.LatestByVendor("aws")
+	results := make([]attestation.Result, 0, len(controls))
+	if collectionErr != nil {
+		observed := time.Now().UTC()
+		for _, c := range controls {
+			results = append(results, attestation.Unknown(c, observed, collectionErr))
+		}
+		return printValue(map[string]any{"provider": "aws", "collectionError": collectionErr.Error(), "results": results}, format)
+	}
+	for _, c := range controls {
+		result, evaluateErr := evaluator.Evaluate(c, snapshot, snapshot.ObservedAt)
+		if evaluateErr != nil {
+			result = attestation.Unknown(c, snapshot.ObservedAt, evaluateErr)
+		}
+		results = append(results, result)
+	}
+	return printValue(map[string]any{"provider": "aws", "snapshot": snapshot, "results": results}, format)
+}
+
+func parseAWSTarget(args []string) (awsprovider.Target, string, string, error) {
+	target := awsprovider.Target{HomeRegion: "us-east-1", GovernedRegions: []string{"us-east-1"}, Architecture: awsprovider.SecurityHubFindingsCentric}
+	trailName, format := "trisoc-organization-trail", "human"
+	for i := 0; i < len(args); i++ {
+		next := func() (string, error) {
+			i++
+			if i >= len(args) {
+				return "", fmt.Errorf("%s requires a value", args[i-1])
+			}
+			return args[i], nil
+		}
+		var value string
+		var err error
+		switch args[i] {
+		case "--profile", "--role-arn", "--external-id", "--home-region", "--regions", "--architecture", "--securityhub-standards", "--trail-name", "--output":
+			value, err = next()
+			if err != nil {
+				return target, trailName, format, err
+			}
+			switch args[i-1] {
+			case "--profile":
+				target.Profile = value
+			case "--role-arn":
+				target.RoleARN = value
+			case "--external-id":
+				target.ExternalID = value
+			case "--home-region":
+				target.HomeRegion = value
+			case "--regions":
+				target.GovernedRegions = splitCSV(value)
+			case "--architecture":
+				target.Architecture = awsprovider.Architecture(value)
+			case "--securityhub-standards":
+				target.RequiredSecurityHubStandards = splitCSV(value)
+			case "--trail-name":
+				trailName = value
+			case "--output":
+				format = value
+			}
+		case "--require-delegated-admins":
+			target.RequireDelegatedAdministrators = true
+		case "--require-security-lake":
+			target.RequireSecurityLake = true
+		default:
+			return target, trailName, format, fmt.Errorf("unknown option %q", args[i])
+		}
+	}
+	return target, trailName, format, nil
 }
 
 func parseAzureTarget(args []string) (azureprovider.Target, string, error) {
@@ -396,7 +522,10 @@ Usage:
   trisoc azure discover --subscription ID --resource-group RG --workspace NAME --output json
   trisoc azure attest --subscription ID --resource-group RG --workspace NAME --expected-tables TABLES
   trisoc azure plan --resource-group RG --workspace NAME --minimum-retention 90
-  trisoc permissions explain --provider azure --output json
+  trisoc aws discover --home-region ap-southeast-2 --regions ap-southeast-2,us-east-1
+  trisoc aws attest --architecture full_aws_native_soc --require-delegated-admins
+  trisoc aws plan --trail-name trisoc-organization-trail --output cloudformation
+  trisoc permissions explain --provider azure|aws --output json
   trisoc doctor
   trisoc version
 `)

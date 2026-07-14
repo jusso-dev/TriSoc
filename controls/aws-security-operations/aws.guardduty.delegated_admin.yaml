@@ -1,0 +1,46 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: aws.guardduty.delegated_admin
+  title: GuardDuty has a delegated organization administrator
+  vendor: aws
+  product: guardduty
+  service: organizations
+  version: 1.0.0
+  status: active
+  tags: [governance, least-privilege, threat-detection]
+spec:
+  classification: vendor_recommended
+  severity: high
+  scopes: [organization]
+  applicability:
+    all:
+      - field: delegatedAdministratorsRequired
+        operator: equals
+        value: true
+  source:
+    title: Designating a delegated GuardDuty administrator account
+    url: https://docs.aws.amazon.com/guardduty/latest/ug/delegated-admin-designate.html
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:cdefdf0058fa81dc8cf5b9f267560c75b08ea26fd61b5933e83767032c7ffe74
+  requiredPermissions: [guardduty:ListOrganizationAdminAccounts]
+  expected:
+    delegatedAdministrator: true
+  collector:
+    provider: aws
+    operation: guardduty.listOrganizationAdminAccounts
+  evaluator:
+    type: cel
+    expression: evidence.guardDutyDelegatedAdministrator == true
+  explanation:
+    technical: No delegated GuardDuty administrator was returned for the organization in the home Region.
+    plainEnglish: GuardDuty is not centrally administered from the approved security account, increasing the chance that accounts drift or go unmonitored.
+  remediation:
+    risk: high
+    automatic: manual_guidance
+    guidance: Confirm the intended security tooling account and designate it through the organization management account.
+    costImpact: none
+    destructive: false
+  evidence:
+    requiredFields: [homeRegion, guardDutyDelegatedAdministrator]
+  maximumEvidenceAge: 24h

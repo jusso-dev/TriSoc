@@ -1,0 +1,14 @@
+{
+  "trailList": [
+    {
+      "HomeRegion": "ap-southeast-2",
+      "IsMultiRegionTrail": true,
+      "IsOrganizationTrail": true,
+      "KmsKeyId": "arn:aws:kms:ap-southeast-2:111122223333:key/00000000-0000-0000-0000-000000000000",
+      "LogFileValidationEnabled": true,
+      "Name": "organization-trail",
+      "S3BucketName": "sanitised-log-archive",
+      "TrailARN": "arn:aws:cloudtrail:ap-southeast-2:111122223333:trail/organization-trail"
+    }
+  ]
+}

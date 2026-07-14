@@ -1,0 +1,44 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: aws.config.recorders_active
+  title: AWS Config recorders are active in governed Regions
+  vendor: aws
+  product: config
+  service: configuration-recorders
+  version: 1.0.0
+  status: active
+  tags: [inventory, posture, regional]
+spec:
+  classification: vendor_recommended
+  severity: high
+  scopes: [region]
+  source:
+    title: Working with the configuration recorder
+    url: https://docs.aws.amazon.com/config/latest/developerguide/stop-start-recorder.html
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:f7f3e22747faece770d57f685eb3d57126e1cc8025c2c3402de376a718ba1da8
+  requiredPermissions: [config:DescribeConfigurationRecorderStatus]
+  expected:
+    recordingInAllGovernedRegions: true
+  collector:
+    provider: aws
+    operation: config.describeConfigurationRecorderStatus
+  evaluator:
+    type: cel
+    expression: evidence.configRecordersAllRegions == true
+  explanation:
+    technical: No active AWS Config recorder was found in at least one governed Region.
+    plainEnglish: AWS resource changes are not being recorded in at least one Region, which weakens posture checks and investigations.
+  remediation:
+    risk: medium
+    automatic: generate_iac
+    guidance: Configure and start a recorder with an approved delivery channel and resource-recording scope.
+    costImpact: usage_dependent
+    destructive: false
+  evidence:
+    requiredFields: [governedRegions, "configRecorders[].region", "configRecorders[].recording"]
+  maximumEvidenceAge: 24h
+  drift:
+    compare: [configRecorders]
+    ignore: [observedAt]

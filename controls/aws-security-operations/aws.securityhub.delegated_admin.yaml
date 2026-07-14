@@ -1,0 +1,46 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: aws.securityhub.delegated_admin
+  title: Security Hub CSPM has a delegated organization administrator
+  vendor: aws
+  product: securityhub
+  service: organizations
+  version: 1.0.0
+  status: active
+  tags: [governance, least-privilege, posture]
+spec:
+  classification: vendor_recommended
+  severity: high
+  scopes: [organization]
+  applicability:
+    all:
+      - field: delegatedAdministratorsRequired
+        operator: equals
+        value: true
+  source:
+    title: Integrating Security Hub CSPM with AWS Organizations
+    url: https://docs.aws.amazon.com/securityhub/latest/userguide/designate-orgs-admin-account.html
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:0a539e85d860e249b4fa2981a2dc4ae15b4e916acd76dff28deb4a8ec669b48c
+  requiredPermissions: [securityhub:ListOrganizationAdminAccounts]
+  expected:
+    delegatedAdministrator: true
+  collector:
+    provider: aws
+    operation: securityhub.listOrganizationAdminAccounts
+  evaluator:
+    type: cel
+    expression: evidence.securityHubDelegatedAdministrator == true
+  explanation:
+    technical: No delegated Security Hub CSPM administrator was returned for the organization in the home Region.
+    plainEnglish: Security Hub is not centrally administered from the approved security account, so settings and findings can fragment across accounts.
+  remediation:
+    risk: high
+    automatic: manual_guidance
+    guidance: Confirm the intended security tooling account and designate it through the organization management account.
+    costImpact: none
+    destructive: false
+  evidence:
+    requiredFields: [homeRegion, securityHubDelegatedAdministrator]
+  maximumEvidenceAge: 24h
