@@ -17,7 +17,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/trisoc/attestor/internal/attestation"
 	"github.com/trisoc/attestor/internal/control"
+	azureprovider "github.com/trisoc/attestor/providers/azure"
 )
 
 const (
@@ -276,9 +278,64 @@ func (s *Server) callTool(call toolCall) (any, error) {
 		}
 		_, result := control.LoadPaths(args.Paths...)
 		return result, nil
+	case "discover_microsoft_sentinel", "run_microsoft_sentinel_attestation", "generate_microsoft_sentinel_bicep":
+		var args azureToolArguments
+		if err := decodeStrict(call.Arguments, &args); err != nil {
+			return nil, err
+		}
+		target := azureprovider.Target{SubscriptionID: args.SubscriptionID, ResourceGroup: args.ResourceGroup, WorkspaceName: args.WorkspaceName, MinimumRetentionDays: args.MinimumRetentionDays, RequiredConnectors: args.RequiredConnectors, ExpectedTables: args.ExpectedTables, RequireAutomation: args.RequireAutomation}
+		if target.MinimumRetentionDays == 0 {
+			target.MinimumRetentionDays = 90
+		}
+		if call.Name == "generate_microsoft_sentinel_bicep" {
+			return azureprovider.GenerateBicepPlan(target)
+		}
+		api, err := azureprovider.NewDefaultAPI(target.SubscriptionID)
+		if err != nil {
+			return nil, err
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		snapshot, err := azureprovider.NewCollector(api, "azure-default-credential").Discover(ctx, target)
+		if call.Name == "discover_microsoft_sentinel" {
+			if err != nil {
+				return nil, err
+			}
+			return snapshot, nil
+		}
+		evaluator, err := attestation.New(serverVersion)
+		if err != nil {
+			return nil, err
+		}
+		results := make([]attestation.Result, 0)
+		if err != nil {
+			observed := time.Now().UTC()
+			for _, c := range s.controls.LatestByVendor("microsoft") {
+				results = append(results, attestation.Unknown(c, observed, err))
+			}
+			return map[string]any{"collectionError": err.Error(), "results": results}, nil
+		}
+		for _, c := range s.controls.LatestByVendor("microsoft") {
+			result, evaluateErr := evaluator.Evaluate(c, snapshot, snapshot.ObservedAt)
+			if evaluateErr != nil {
+				result = attestation.Unknown(c, snapshot.ObservedAt, evaluateErr)
+			}
+			results = append(results, result)
+		}
+		return map[string]any{"snapshot": snapshot, "results": results}, nil
 	default:
 		return nil, fmt.Errorf("unknown tool %q", call.Name)
 	}
+}
+
+type azureToolArguments struct {
+	SubscriptionID       string   `json:"subscriptionId"`
+	ResourceGroup        string   `json:"resourceGroup"`
+	WorkspaceName        string   `json:"workspaceName"`
+	MinimumRetentionDays int32    `json:"minimumRetentionDays"`
+	RequiredConnectors   []string `json:"requiredConnectors"`
+	ExpectedTables       []string `json:"expectedTables"`
+	RequireAutomation    bool     `json:"requireAutomation"`
 }
 
 func toolDefinitions() []map[string]any {
@@ -287,7 +344,14 @@ func toolDefinitions() []map[string]any {
 		{"name": "list_controls", "description": "Read-only: list versioned controls. Requires no cloud scopes. Results are capped at 200.", "inputSchema": map[string]any{"type": "object", "properties": map[string]any{"vendor": map[string]any{"type": "string", "enum": []string{"microsoft", "aws", "google"}}, "limit": map[string]any{"type": "integer", "minimum": 1, "maximum": 200}}, "additionalProperties": false}, "annotations": readOnly},
 		{"name": "get_control", "description": "Read-only: retrieve an exact control definition. Requires no cloud scopes.", "inputSchema": map[string]any{"type": "object", "properties": map[string]any{"id": map[string]any{"type": "string"}, "version": map[string]any{"type": "string"}}, "required": []string{"id"}, "additionalProperties": false}, "annotations": readOnly},
 		{"name": "validate_control_bundle", "description": "Read-only: validate local control YAML with strict schema, official-source and CEL checks. Does not execute control content.", "inputSchema": map[string]any{"type": "object", "properties": map[string]any{"paths": map[string]any{"type": "array", "maxItems": 20, "items": map[string]any{"type": "string"}}}, "additionalProperties": false}, "annotations": readOnly},
+		{"name": "discover_microsoft_sentinel", "description": "Read-only cloud discovery: inspect one Microsoft Sentinel workspace using Azure SDK credentials. Requires workspace, onboarding state, connector, rule, automation and Log Analytics query read scopes.", "inputSchema": azureToolSchema(), "annotations": map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true}},
+		{"name": "run_microsoft_sentinel_attestation", "description": "Read-only assessment: discover and evaluate the latest Microsoft Sentinel control versions. Collection errors never become passes or failures.", "inputSchema": azureToolSchema(), "annotations": map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true}},
+		{"name": "generate_microsoft_sentinel_bicep", "description": "Planning only: generate reviewable Bicep for Sentinel onboarding and retention. Makes no cloud changes and has usage-dependent cost implications.", "inputSchema": azureToolSchema(), "annotations": readOnly},
 	}
+}
+
+func azureToolSchema() map[string]any {
+	return map[string]any{"type": "object", "properties": map[string]any{"subscriptionId": map[string]any{"type": "string"}, "resourceGroup": map[string]any{"type": "string"}, "workspaceName": map[string]any{"type": "string"}, "minimumRetentionDays": map[string]any{"type": "integer", "minimum": 30, "maximum": 730}, "requiredConnectors": map[string]any{"type": "array", "maxItems": 100, "items": map[string]any{"type": "string"}}, "expectedTables": map[string]any{"type": "array", "maxItems": 100, "items": map[string]any{"type": "string"}}, "requireAutomation": map[string]any{"type": "boolean"}}, "required": []string{"subscriptionId", "resourceGroup", "workspaceName"}, "additionalProperties": false}
 }
 
 func toolResult(value any) map[string]any {

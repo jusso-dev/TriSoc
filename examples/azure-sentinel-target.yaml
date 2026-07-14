@@ -1,0 +1,13 @@
+subscriptionId: 00000000-0000-0000-0000-000000000000
+resourceGroup: security-operations
+workspaceName: sentinel-production
+minimumRetentionDays: 90
+requiredConnectors:
+  - AzureActiveDirectory
+  - AzureActivity
+expectedTables:
+  - SigninLogs
+  - AuditLogs
+  - AzureActivity
+requireAutomation: true
+

@@ -1,0 +1,37 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: microsoft.sentinel.audit_monitoring
+  title: Microsoft Sentinel audit monitoring is producing data
+  vendor: microsoft
+  product: sentinel
+  service: audit-monitoring
+  version: 1.0.0
+  status: active
+  tags: [audit, integrity]
+spec:
+  classification: vendor_required
+  severity: high
+  scopes: [workspace]
+  source:
+    title: Auditing and health monitoring in Microsoft Sentinel
+    url: https://learn.microsoft.com/en-us/azure/sentinel/health-audit
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:97466afc1b8d5cded488f8bca8ea17a2e285719ec368ce2a02afcadf4f457f12
+  requiredPermissions: [Microsoft.OperationalInsights/workspaces/query/read]
+  expected: {auditDataPresent: true}
+  collector: {provider: microsoft, operation: logAnalytics.sentinelAudit.query}
+  evaluator: {type: cel, expression: "evidence.health.auditDataPresent == true"}
+  explanation:
+    technical: No recent SentinelAudit event was returned, preventing attestation of supported analytics-rule configuration changes and their initiating identities.
+    plainEnglish: Changes to important Sentinel content may not be visible in the audit record, making unauthorised or accidental changes harder to investigate.
+  remediation:
+    risk: low
+    automatic: generate_iac
+    planGenerator: microsoft.sentinel.audit_monitoring
+    guidance: Enable Sentinel audit monitoring, make an approved test change, and confirm a corresponding SentinelAudit record is received.
+    costImpact: usage_dependent
+    destructive: false
+  evidence: {requiredFields: [workspaceId, health.auditDataPresent, health.lastAuditEvent]}
+  maximumEvidenceAge: 6h
+

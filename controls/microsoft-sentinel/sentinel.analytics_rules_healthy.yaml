@@ -1,0 +1,36 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: microsoft.sentinel.analytics_rules_healthy
+  title: Microsoft Sentinel analytics rule executions are healthy
+  vendor: microsoft
+  product: sentinel
+  service: analytics-rules
+  version: 1.0.0
+  status: active
+  tags: [detections, health]
+spec:
+  classification: vendor_recommended
+  severity: high
+  scopes: [workspace]
+  source:
+    title: Monitor the health and audit the integrity of your analytics rules
+    url: https://learn.microsoft.com/en-us/azure/sentinel/monitor-analytics-rule-integrity
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:555b430d34fcd51f6302116c78746b51ca8c666985d94941f45939dca8670325
+  requiredPermissions: [Microsoft.OperationalInsights/workspaces/query/read]
+  expected: {analyticsRuleFailures: 0}
+  collector: {provider: microsoft, operation: logAnalytics.sentinelHealth.query}
+  evaluator: {type: cel, expression: "evidence.health.monitoringDataPresent == true && evidence.health.analyticsRuleFailures == 0"}
+  explanation:
+    technical: SentinelHealth contains one or more unsuccessful analytics rule executions during the assessment window, or health evidence is unavailable.
+    plainEnglish: A Sentinel detection has recently failed to run successfully, so matching activity may not have produced an alert.
+  remediation:
+    risk: low
+    automatic: manual_guidance
+    guidance: Inspect the failed rule health events and query error, repair its telemetry or KQL prerequisites, then rerun and verify the rule.
+    costImpact: none
+    destructive: false
+  evidence: {requiredFields: [health.monitoringDataPresent, health.analyticsRuleFailures]}
+  maximumEvidenceAge: 1h
+

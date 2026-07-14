@@ -1,0 +1,38 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: microsoft.sentinel.required_connectors
+  title: Required Microsoft Sentinel data connectors are enabled
+  vendor: microsoft
+  product: sentinel
+  service: data-connectors
+  version: 1.0.0
+  status: active
+  tags: [telemetry, connectors]
+spec:
+  classification: organisation_policy
+  severity: high
+  scopes: [workspace]
+  applicability:
+    all:
+      - {field: requiredConnectorsConfigured, operator: equals, value: true}
+  source:
+    title: Connect data sources to Microsoft Sentinel by using data connectors
+    url: https://learn.microsoft.com/en-us/azure/sentinel/configure-data-connector
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:e3818e1e2e2cdb60e9e41321f31ebaf679d03d34d697e6a3f9221596af6ce369
+  requiredPermissions: [Microsoft.SecurityInsights/dataConnectors/read]
+  expected: {requiredConnectorsPresent: true}
+  collector: {provider: microsoft, operation: sentinel.dataConnectors.list}
+  evaluator: {type: cel, expression: "evidence.requiredConnectorsPresent == true"}
+  explanation:
+    technical: One or more connectors declared by the environment baseline are missing or do not expose an enabled data type in the Sentinel connector configuration.
+    plainEnglish: A security data source your organisation requires is not connected, so related activity may be missing from monitoring and detections.
+  remediation:
+    risk: medium
+    automatic: manual_guidance
+    guidance: Review the missing connector against its vendor instructions, permissions, licensing, duplication risk, and ingestion cost before enabling it.
+    costImpact: usage_dependent
+    destructive: false
+  evidence: {requiredFields: [requiredConnectors, requiredConnectorsPresent, connectors]}
+  maximumEvidenceAge: 6h

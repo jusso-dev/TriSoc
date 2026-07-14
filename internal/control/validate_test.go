@@ -12,8 +12,8 @@ func TestBundledControlsValidate(t *testing.T) {
 	if !result.Valid {
 		t.Fatalf("bundled controls are invalid: %+v", result.Issues)
 	}
-	if result.Controls != 3 {
-		t.Fatalf("controls = %d, want 3", result.Controls)
+	if result.Controls < 3 {
+		t.Fatalf("controls = %d, want at least 3", result.Controls)
 	}
 }
 

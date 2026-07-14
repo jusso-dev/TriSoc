@@ -41,7 +41,7 @@ func TestStdioInitializeAndListTools(t *testing.T) {
 		t.Fatal(err)
 	}
 	tools := listed["result"].(map[string]any)["tools"].([]any)
-	if len(tools) != 3 {
+	if len(tools) != 6 {
 		t.Fatalf("tools=%d", len(tools))
 	}
 }

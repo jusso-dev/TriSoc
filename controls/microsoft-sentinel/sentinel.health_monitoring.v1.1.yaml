@@ -1,0 +1,37 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: microsoft.sentinel.health_monitoring
+  title: Microsoft Sentinel health monitoring is producing data
+  vendor: microsoft
+  product: sentinel
+  service: health-monitoring
+  version: 1.1.0
+  status: active
+  tags: [health, foundational]
+spec:
+  classification: vendor_required
+  severity: high
+  scopes: [workspace]
+  source:
+    title: Turn on auditing and health monitoring in Microsoft Sentinel
+    url: https://learn.microsoft.com/en-us/azure/sentinel/enable-monitoring
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:1b1677a60a17ab0ce2f5569e88682856e615d0c093c6da9430ad8d6693b9bf30
+  requiredPermissions: [Microsoft.OperationalInsights/workspaces/query/read]
+  expected: {monitoringDataPresent: true}
+  collector: {provider: microsoft, operation: logAnalytics.sentinelHealth.query}
+  evaluator: {type: cel, expression: "evidence.health.monitoringDataPresent == true"}
+  explanation:
+    technical: No recent SentinelHealth event was returned for the workspace, so supported connector, analytics, and automation health cannot be continuously verified.
+    plainEnglish: Sentinel is not providing recent health information, which can hide broken connectors, detections, or automated response actions.
+  remediation:
+    risk: low
+    automatic: generate_iac
+    planGenerator: microsoft.sentinel.health_monitoring
+    guidance: Enable Sentinel health monitoring and verify that a newly generated resource event appears in SentinelHealth before closing the finding.
+    costImpact: low
+    destructive: false
+  evidence: {requiredFields: [workspaceId, health.monitoringDataPresent, health.lastHealthEvent]}
+  maximumEvidenceAge: 1h
+

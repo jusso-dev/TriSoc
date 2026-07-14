@@ -1,0 +1,38 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: microsoft.sentinel.connector_data_recent
+  title: Expected Sentinel log tables contain recent data
+  vendor: microsoft
+  product: sentinel
+  service: telemetry
+  version: 1.0.0
+  status: active
+  tags: [telemetry, health]
+spec:
+  classification: organisation_policy
+  severity: critical
+  scopes: [workspace]
+  applicability:
+    all:
+      - {field: telemetryRequired, operator: equals, value: true}
+  source:
+    title: Onboard Microsoft Sentinel
+    url: https://learn.microsoft.com/en-us/azure/sentinel/quickstart-onboard
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:af46cc329fce88abc43f81b4f3bdef761007d42aad644d625acd8f99e9cbd144
+  requiredPermissions: [Microsoft.OperationalInsights/workspaces/query/read]
+  expected: {allExpectedTablesHealthy: true}
+  collector: {provider: microsoft, operation: logAnalytics.expectedTables.query}
+  evaluator: {type: cel, expression: "evidence.telemetry.size() > 0 && evidence.telemetry.all(t, t.healthy == true)"}
+  explanation:
+    technical: At least one expected Log Analytics table has no event inside its configured maximum age, even if its Sentinel connector resource still exists.
+    plainEnglish: Security events from an expected source have stopped arriving recently, which may prevent related detections from firing.
+  remediation:
+    risk: low
+    automatic: manual_guidance
+    guidance: Check the affected connector identity, authentication errors, upstream source, throttling, and destination table before changing configuration.
+    costImpact: none
+    destructive: false
+  evidence: {requiredFields: [telemetry]}
+  maximumEvidenceAge: 1h

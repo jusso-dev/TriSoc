@@ -1,0 +1,16 @@
+{
+  "Name": "TriSOC Attestor Microsoft Sentinel Reader",
+  "IsCustom": true,
+  "Description": "Read-only Microsoft Sentinel assessment permissions generated from implemented collector operations.",
+  "Actions": [
+    "Microsoft.OperationalInsights/workspaces/read",
+    "Microsoft.OperationalInsights/workspaces/query/read",
+    "Microsoft.SecurityInsights/onboardingStates/read",
+    "Microsoft.SecurityInsights/dataConnectors/read",
+    "Microsoft.SecurityInsights/alertRules/read",
+    "Microsoft.SecurityInsights/automationRules/read"
+  ],
+  "NotActions": [],
+  "AssignableScopes": ["/subscriptions/<subscription-id>"]
+}
+

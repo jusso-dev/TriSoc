@@ -1,0 +1,36 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: microsoft.sentinel.analytics_rules_enabled
+  title: Deployed Microsoft Sentinel analytics rules are enabled
+  vendor: microsoft
+  product: sentinel
+  service: analytics-rules
+  version: 1.0.0
+  status: active
+  tags: [detections, coverage]
+spec:
+  classification: organisation_policy
+  severity: high
+  scopes: [workspace]
+  source:
+    title: Monitor the health and audit the integrity of your analytics rules
+    url: https://learn.microsoft.com/en-us/azure/sentinel/monitor-analytics-rule-integrity
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:555b430d34fcd51f6302116c78746b51ca8c666985d94941f45939dca8670325
+  requiredPermissions: [Microsoft.SecurityInsights/alertRules/read]
+  expected: {allRulesEnabled: true}
+  collector: {provider: microsoft, operation: sentinel.alertRules.list}
+  evaluator: {type: cel, expression: "evidence.alertRules.size() > 0 && evidence.alertRules.all(r, r.enabled == true)"}
+  explanation:
+    technical: The workspace has no analytics rules or at least one deployed rule reports enabled=false in its provider configuration.
+    plainEnglish: One or more Sentinel detections are switched off, leaving the activity they cover without that alerting logic.
+  remediation:
+    risk: medium
+    automatic: manual_guidance
+    guidance: Confirm the rule owner, query prerequisites, duplication, and approved version before enabling it through the repository-backed workflow.
+    costImpact: usage_dependent
+    destructive: false
+  evidence: {requiredFields: [alertRules]}
+  maximumEvidenceAge: 6h
+

@@ -6,10 +6,13 @@ Start the recommended stdio transport:
 TRISOC_CONTROL_DIR=/absolute/path/to/controls trisoc mcp serve --transport stdio
 ```
 
-Available tools are `list_controls`, `get_control`, and
-`validate_control_bundle`. They are read-only, idempotent, bounded, and require
-no cloud scope. Unknown arguments are rejected. Validation paths must be relative
-and may not traverse a parent directory.
+Catalogue tools are `list_controls`, `get_control`, and
+`validate_control_bundle`. Sentinel adds `discover_microsoft_sentinel`,
+`run_microsoft_sentinel_attestation`, and
+`generate_microsoft_sentinel_bicep`. Discovery/attestation require the read-only
+permissions documented in `PROVIDER_PERMISSIONS.md`; planning makes no cloud
+change. Unknown arguments are rejected and collection calls have a two-minute
+deadline.
 
 For local HTTP:
 

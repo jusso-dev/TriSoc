@@ -1,0 +1,38 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: microsoft.sentinel.automation_rules_enabled
+  title: Deployed Microsoft Sentinel automation rules are enabled
+  vendor: microsoft
+  product: sentinel
+  service: automation-rules
+  version: 1.0.0
+  status: active
+  tags: [automation, response]
+spec:
+  classification: organisation_policy
+  severity: high
+  scopes: [workspace]
+  applicability:
+    all:
+      - {field: automationRequired, operator: equals, value: true}
+  source:
+    title: Monitor the health of your Microsoft Sentinel automation rules and playbooks
+    url: https://learn.microsoft.com/en-us/azure/sentinel/monitor-automation-health
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:8138392b913725256213cde3a8a2555622c5fec6a077d1451408dc3ad6f6c210
+  requiredPermissions: [Microsoft.SecurityInsights/automationRules/read]
+  expected: {allAutomationRulesEnabled: true}
+  collector: {provider: microsoft, operation: sentinel.automationRules.list}
+  evaluator: {type: cel, expression: "evidence.automationRules.size() > 0 && evidence.automationRules.all(r, r.enabled == true)"}
+  explanation:
+    technical: The workspace has no automation rules or at least one deployed automation rule reports disabled in its triggering logic.
+    plainEnglish: An automated incident-handling step is switched off, so alerts may not be enriched, assigned, notified, or contained as expected.
+  remediation:
+    risk: medium
+    automatic: manual_guidance
+    guidance: Review the automation owner, conditions, actions, managed identity, playbook permissions, and expiry before re-enabling the rule.
+    costImpact: usage_dependent
+    destructive: false
+  evidence: {requiredFields: [automationRules]}
+  maximumEvidenceAge: 6h

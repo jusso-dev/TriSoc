@@ -4,11 +4,10 @@ TriSOC Attestor builds, validates and continuously attests Microsoft Sentinel,
 AWS-native security operations, and Google Security Operations environments
 against reviewed vendor guidance.
 
-This repository currently contains the first foundation slice: a strict,
-versioned control format; a canonical PostgreSQL schema; redacted evidence
-hashing; a `trisoc` CLI; and a local, read-only MCP control catalogue. Cloud
-discovery and assessment collectors are the next delivery phases. Nothing in
-this release claims to have assessed a cloud environment.
+The foundation and Microsoft Sentinel provider are implemented: strict versioned
+controls, canonical PostgreSQL schema, redacted evidence hashing, Azure SDK-backed
+read-only discovery, deterministic attestation, drift comparison, Bicep planning,
+CLI workflows, and local MCP tools. AWS and Google provider phases follow.
 
 > TriSOC Attestor assists with deployment and continuous attestation. It does
 > not guarantee security, replace incident response, or replace qualified cloud
@@ -18,19 +17,20 @@ this release claims to have assessed a cloud environment.
 
 - Strict YAML decoding and deterministic validation of control metadata,
   official source domains, lifecycles, remediation safety, and CEL expressions.
-- Three reviewed example controls, one for each supported provider.
+- Ten active Microsoft Sentinel control IDs plus reviewed AWS and Google examples.
 - Recursive sensitive-value redaction followed by deterministic SHA-256
   evidence hashing.
 - PostgreSQL schema covering organisations, immutable assessments and evidence,
   drift, findings, telemetry, detections, approvals, exceptions, and audit data.
 - CLI control validation with human, JSON, and YAML output.
-- MCP over stdio and stateless Streamable HTTP with `list_controls`,
-  `get_control`, and `validate_control_bundle`.
+- MCP over stdio and stateless Streamable HTTP with control catalogue tools and
+  read-only Sentinel discovery, attestation, and Bicep planning.
+- Official Azure SDK integration for workspace, Sentinel, and Log Analytics APIs.
 - Loopback-only networking by default, bounded MCP inputs and outputs, and no
   write tools in the first release slice.
 
-Provider discovery, assessment, remediation application, scheduling, reports,
-and the management UI are explicitly roadmap work—not mock implementations.
+AWS/Google discovery, remediation application, scheduling, reports, and the
+management UI are explicitly roadmap work—not mock implementations.
 
 ## Architecture
 
@@ -74,16 +74,14 @@ go build -o bin/trisoc ./cmd/trisoc
 
 ## Read-only first scan
 
-Cloud scans are not included in the first foundation slice. In phase 2, the
-first real scan will be:
+The first real Microsoft Sentinel scan is:
 
 ```sh
-trisoc provider add azure
-trisoc discover --environment production
-trisoc attest --environment production
+trisoc azure discover --subscription ID --resource-group RG --workspace NAME --output json
+trisoc azure attest --subscription ID --resource-group RG --workspace NAME --expected-tables SigninLogs,AuditLogs
 ```
 
-Discovery and attestation will be read-only. Evidence collection errors will
+Discovery and attestation are read-only. Evidence collection errors
 produce `unknown` or `error`, never `fail` or `pass`.
 
 ## MCP setup
@@ -116,8 +114,8 @@ Example daily prompt for the completed product:
 > plain English. Do not apply remediation. Generate reviewable plans for
 > critical and high-severity findings.
 
-The current MCP server can inspect and validate controls only; it will not
-pretend to execute that future workflow.
+The current MCP server can inspect controls and assess one configured Sentinel
+workspace. Multi-environment daily orchestration remains phase 5 work.
 
 ## Security model
 
@@ -161,9 +159,9 @@ The proposed GitHub milestone and issue inventory is in [docs/ROADMAP.md](docs/R
 
 ## Limitations
 
-- No provider credentials or cloud APIs are used yet.
-- No environment can yet be attested; the persisted schema is ready for the
-  collectors that begin in phase 2.
+- AWS and Google provider APIs are not implemented yet.
+- Sentinel currently targets one explicitly named workspace per command and does
+  not persist the result to PostgreSQL; scheduled persistence begins in phase 5.
 - HTTP MCP is stateless and binds to loopback by default; a non-loopback native
   bind requires an explicit bearer token and TLS termination remains external.
 - Guidance hashes cover fetched HTML and can change due to non-substantive page

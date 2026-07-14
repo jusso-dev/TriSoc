@@ -1,0 +1,38 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: microsoft.sentinel.ingestion_drop
+  title: Sentinel telemetry has no critical unexpected ingestion drop
+  vendor: microsoft
+  product: sentinel
+  service: telemetry
+  version: 1.0.0
+  status: active
+  tags: [telemetry, anomaly]
+spec:
+  classification: architectural_recommendation
+  severity: high
+  scopes: [workspace]
+  applicability:
+    all:
+      - {field: telemetryRequired, operator: equals, value: true}
+  source:
+    title: Auditing and health monitoring in Microsoft Sentinel
+    url: https://learn.microsoft.com/en-us/azure/sentinel/health-audit
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:97466afc1b8d5cded488f8bca8ea17a2e285719ec368ce2a02afcadf4f457f12
+  requiredPermissions: [Microsoft.OperationalInsights/workspaces/query/read]
+  expected: {maximumDropPercent: 80}
+  collector: {provider: microsoft, operation: logAnalytics.telemetryBaseline.query}
+  evaluator: {type: cel, expression: "evidence.telemetry.size() > 0 && evidence.telemetry.all(t, t.dropPercent < 80.0)"}
+  explanation:
+    technical: At least one expected table received over eighty percent fewer recent events than its comparison period; new sources and maintenance windows need reviewer context.
+    plainEnglish: A major fall in incoming security events may indicate a broken source or connector and could leave monitoring with a substantial blind spot.
+  remediation:
+    risk: low
+    automatic: manual_guidance
+    guidance: Validate maintenance and seasonality, then inspect the source, connector authentication, rate limits, routing, and workspace availability.
+    costImpact: none
+    destructive: false
+  evidence: {requiredFields: [telemetry]}
+  maximumEvidenceAge: 1h

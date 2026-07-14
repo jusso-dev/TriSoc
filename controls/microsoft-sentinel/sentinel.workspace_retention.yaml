@@ -1,0 +1,37 @@
+apiVersion: attestor.trisoc.io/v1
+kind: Control
+metadata:
+  id: microsoft.sentinel.workspace_retention
+  title: Sentinel workspace retention meets the approved minimum
+  vendor: microsoft
+  product: sentinel
+  service: log-analytics
+  version: 1.0.0
+  status: active
+  tags: [retention, investigation]
+spec:
+  classification: organisation_policy
+  severity: high
+  scopes: [workspace]
+  source:
+    title: Manage data retention in a Log Analytics workspace
+    url: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/data-retention-configure
+    retrievedAt: 2026-07-14T00:00:00Z
+    contentHash: sha256:958e003fb8333a64a88e09513edc74fa234229d1df2f967088f1ac25638aea73
+  requiredPermissions: [Microsoft.OperationalInsights/workspaces/read]
+  expected: {retentionMeetsBaseline: true}
+  collector: {provider: microsoft, operation: operationalInsights.workspaces.get}
+  evaluator: {type: cel, expression: "evidence.retentionDays >= evidence.minimumRetentionDays"}
+  explanation:
+    technical: Workspace-level analytics retention is shorter than the minimum declared in the environment baseline; table-level overrides require separate assessment.
+    plainEnglish: Security records may be removed sooner than your organisation expects, reducing the period available for investigations and threat hunting.
+  remediation:
+    risk: medium
+    automatic: generate_iac
+    planGenerator: microsoft.sentinel.workspace_retention
+    guidance: Review cost and legal requirements, then increase retention with the generated Bicep plan; never reduce retention automatically.
+    costImpact: usage_dependent
+    destructive: false
+  evidence: {requiredFields: [workspaceResourceId, retentionDays, minimumRetentionDays]}
+  maximumEvidenceAge: 24h
+

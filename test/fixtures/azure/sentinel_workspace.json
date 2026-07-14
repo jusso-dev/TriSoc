@@ -1,0 +1,34 @@
+{
+  "workspace": {
+    "resourceId": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/security/providers/Microsoft.OperationalInsights/workspaces/soc-prod",
+    "customerId": "11111111-1111-1111-1111-111111111111",
+    "name": "soc-prod",
+    "resourceGroup": "security",
+    "location": "australiaeast",
+    "provisioningState": "Succeeded",
+    "retentionDays": 90
+  },
+  "sentinelEnabled": true,
+  "connectors": [
+    {"id": "/redacted/connectors/entra", "name": "entra", "kind": "AzureActiveDirectory", "enabled": true},
+    {"id": "/redacted/connectors/activity", "name": "activity", "kind": "AzureActivity", "enabled": true}
+  ],
+  "alertRules": [
+    {"id": "/redacted/rules/rule-1", "name": "rule-1", "displayName": "Approved test rule", "kind": "Scheduled", "enabled": true, "templateVersion": "1.0.0"}
+  ],
+  "automationRules": [
+    {"id": "/redacted/automation/auto-1", "name": "auto-1", "displayName": "Assign incidents", "enabled": true, "actionCount": 1}
+  ],
+  "health": {
+    "lastHealthEvent": "2026-07-14T00:00:00Z",
+    "lastAuditEvent": "2026-07-14T00:00:00Z",
+    "connectorFailures": 0,
+    "analyticsRuleFailures": 0,
+    "automationFailures": 0
+  },
+  "telemetry": [
+    {"table": "SigninLogs", "lastEvent": "2026-07-14T00:25:00Z", "maximumAgeMinutes": 60, "recentEvents": 950, "baselineMedian": 1000, "dropPercent": 5, "healthy": true},
+    {"table": "AzureActivity", "lastEvent": "2026-07-14T00:20:00Z", "maximumAgeMinutes": 60, "recentEvents": 475, "baselineMedian": 500, "dropPercent": 5, "healthy": true}
+  ]
+}
+
