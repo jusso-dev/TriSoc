@@ -4,6 +4,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
+COPY providers ./providers
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/trisoc ./cmd/trisoc
 
 FROM gcr.io/distroless/static-debian12:nonroot
