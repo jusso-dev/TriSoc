@@ -19,6 +19,8 @@ import (
 
 	"github.com/trisoc/attestor/internal/attestation"
 	"github.com/trisoc/attestor/internal/control"
+	"github.com/trisoc/attestor/internal/logsource"
+	"github.com/trisoc/attestor/internal/maturity"
 	awsprovider "github.com/trisoc/attestor/providers/aws"
 	azureprovider "github.com/trisoc/attestor/providers/azure"
 )
@@ -279,6 +281,23 @@ func (s *Server) callTool(call toolCall) (any, error) {
 		}
 		_, result := control.LoadPaths(args.Paths...)
 		return result, nil
+	case "check_log_sources":
+		var args struct {
+			Inventory   logsource.Inventory `json:"inventory"`
+			EvaluatedAt time.Time           `json:"evaluatedAt"`
+		}
+		if err := decodeStrict(call.Arguments, &args); err != nil {
+			return nil, err
+		}
+		return logsource.Evaluate(args.Inventory, args.EvaluatedAt)
+	case "check_soc_maturity":
+		var args struct {
+			Assessment maturity.Assessment `json:"assessment"`
+		}
+		if err := decodeStrict(call.Arguments, &args); err != nil {
+			return nil, err
+		}
+		return maturity.Evaluate(args.Assessment)
 	case "discover_microsoft_sentinel", "run_microsoft_sentinel_attestation", "generate_microsoft_sentinel_bicep":
 		var args azureToolArguments
 		if err := decodeStrict(call.Arguments, &args); err != nil {
@@ -412,12 +431,144 @@ func toolDefinitions() []map[string]any {
 		{"name": "list_controls", "description": "Read-only: list versioned controls. Requires no cloud scopes. Results are capped at 200.", "inputSchema": map[string]any{"type": "object", "properties": map[string]any{"vendor": map[string]any{"type": "string", "enum": []string{"microsoft", "aws", "google"}}, "limit": map[string]any{"type": "integer", "minimum": 1, "maximum": 200}}, "additionalProperties": false}, "annotations": readOnly},
 		{"name": "get_control", "description": "Read-only: retrieve an exact control definition. Requires no cloud scopes.", "inputSchema": map[string]any{"type": "object", "properties": map[string]any{"id": map[string]any{"type": "string"}, "version": map[string]any{"type": "string"}}, "required": []string{"id"}, "additionalProperties": false}, "annotations": readOnly},
 		{"name": "validate_control_bundle", "description": "Read-only: validate local control YAML with strict schema, official-source and CEL checks. Does not execute control content.", "inputSchema": map[string]any{"type": "object", "properties": map[string]any{"paths": map[string]any{"type": "array", "maxItems": 20, "items": map[string]any{"type": "string"}}}, "additionalProperties": false}, "annotations": readOnly},
+		{"name": "check_log_sources", "description": "Read-only: check declared SIEM log sources for required coverage, enablement, freshness, retention, and platform normalization. Supports Microsoft Sentinel ASIM, AWS Security Lake OCSF, Google Security Operations UDM, and Splunk CIM.", "inputSchema": logSourceToolSchema(), "annotations": readOnly},
+		{"name": "check_soc_maturity", "description": "Read-only: gate a SIEM implementation using all 27 SOC-CMM 2.4.2 Basic aspect results, evidence, default maturity/capability targets, and required Log Management and Log Monitoring controls.", "inputSchema": maturityToolSchema(), "annotations": readOnly},
 		{"name": "discover_microsoft_sentinel", "description": "Read-only cloud discovery: inspect one Microsoft Sentinel workspace using Azure SDK credentials. Requires workspace, onboarding state, connector, rule, automation and Log Analytics query read scopes.", "inputSchema": azureToolSchema(), "annotations": map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true}},
 		{"name": "run_microsoft_sentinel_attestation", "description": "Read-only assessment: discover and evaluate the latest Microsoft Sentinel control versions. Collection errors never become passes or failures.", "inputSchema": azureToolSchema(), "annotations": map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true}},
 		{"name": "generate_microsoft_sentinel_bicep", "description": "Planning only: generate reviewable Bicep for Sentinel onboarding and retention. Makes no cloud changes and has usage-dependent cost implications.", "inputSchema": azureToolSchema(), "annotations": readOnly},
 		{"name": "discover_aws_security_operations", "description": "Read-only cloud discovery: inspect AWS Organizations, GuardDuty, Security Hub CSPM, CloudTrail, Config, optional Security Lake, and explicitly selected OpenSearch resources. Requires the documented assessment role.", "inputSchema": awsToolSchema(), "annotations": map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true}},
 		{"name": "run_aws_security_operations_attestation", "description": "Read-only assessment: discover and evaluate the latest AWS-native security operations controls. Collection errors become unknown, never pass or fail.", "inputSchema": awsToolSchema(), "annotations": map[string]any{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true}},
 		{"name": "generate_aws_cloudformation", "description": "Planning only: generate reviewable CloudFormation for an encrypted organization multi-Region CloudTrail. Makes no cloud changes and flags usage-dependent costs.", "inputSchema": awsToolSchema(), "annotations": readOnly},
+	}
+}
+
+func maturityToolSchema() map[string]any {
+	model, _ := maturity.BuiltinModel()
+	aspectIDs := make([]string, 0, 27)
+	for _, domain := range model.Domains {
+		for _, aspect := range domain.Aspects {
+			aspectIDs = append(aspectIDs, aspect.ID)
+		}
+	}
+	controlIDs := make([]string, 0, len(model.Controls))
+	for _, control := range model.Controls {
+		controlIDs = append(controlIDs, control.ID)
+	}
+	evidence := map[string]any{"type": "array", "maxItems": 50, "items": map[string]any{"type": "string", "minLength": 1, "maxLength": 2048}}
+	aspectResult := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"id":         map[string]any{"type": "string", "enum": aspectIDs},
+			"maturity":   map[string]any{"type": "number", "minimum": 0, "maximum": 5},
+			"capability": map[string]any{"type": "number", "minimum": 0, "maximum": 3},
+			"evidence":   evidence,
+		},
+		"required":             []string{"id", "maturity", "evidence"},
+		"additionalProperties": false,
+	}
+	controlResult := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"id":       map[string]any{"type": "string", "enum": controlIDs},
+			"status":   map[string]any{"type": "string", "enum": []string{maturity.StatusPass, maturity.StatusFail}},
+			"evidence": evidence,
+		},
+		"required":             []string{"id", "status", "evidence"},
+		"additionalProperties": false,
+	}
+	assessment := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"apiVersion": map[string]any{"type": "string", "const": maturity.APIVersion},
+			"kind":       map[string]any{"type": "string", "const": maturity.Kind},
+			"metadata": map[string]any{"type": "object", "properties": map[string]any{
+				"name": map[string]any{"type": "string", "minLength": 1, "maxLength": 256},
+			}, "required": []string{"name"}, "additionalProperties": false},
+			"spec": map[string]any{"type": "object", "properties": map[string]any{
+				"model": map[string]any{"type": "string", "const": maturity.ModelRef},
+				"policy": map[string]any{"type": "object", "properties": map[string]any{
+					"minimumMaturity":   map[string]any{"type": "number", "minimum": model.Defaults.MinimumMaturity, "maximum": 5},
+					"minimumCapability": map[string]any{"type": "number", "minimum": model.Defaults.MinimumCapability, "maximum": 3},
+				}, "additionalProperties": false},
+				"aspectResults":  map[string]any{"type": "array", "maxItems": 100, "items": aspectResult},
+				"controlResults": map[string]any{"type": "array", "maxItems": 200, "items": controlResult},
+			}, "required": []string{"model", "aspectResults", "controlResults"}, "additionalProperties": false},
+		},
+		"required":             []string{"apiVersion", "kind", "metadata", "spec"},
+		"additionalProperties": false,
+	}
+	return map[string]any{"type": "object", "properties": map[string]any{"assessment": assessment}, "required": []string{"assessment"}, "additionalProperties": false}
+}
+
+func logSourceToolSchema() map[string]any {
+	platforms := logsource.SupportedPlatforms()
+	normalization := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"standard":        map[string]any{"type": "string", "minLength": 1, "maxLength": 32},
+			"schema":          map[string]any{"type": "string", "minLength": 1, "maxLength": 256},
+			"version":         map[string]any{"type": "string", "maxLength": 64},
+			"coveragePercent": map[string]any{"type": "number", "minimum": 0, "maximum": 100},
+			"validated":       map[string]any{"type": "boolean"},
+		},
+		"required":             []string{"standard", "schema", "coveragePercent", "validated"},
+		"additionalProperties": false,
+	}
+	requirement := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"platform":     map[string]any{"type": "string", "enum": platforms},
+			"sourceId":     map[string]any{"type": "string", "maxLength": 256},
+			"category":     map[string]any{"type": "string", "maxLength": 128},
+			"minimumCount": map[string]any{"type": "integer", "minimum": 1, "maximum": 10000},
+		},
+		"required":             []string{"platform"},
+		"additionalProperties": false,
+	}
+	policy := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"minimumRetentionDays":         map[string]any{"type": "integer", "minimum": 1, "maximum": 3650},
+			"maximumEventAgeMinutes":       map[string]any{"type": "integer", "minimum": 1, "maximum": 525600},
+			"minimumNormalizationCoverage": map[string]any{"type": "number", "exclusiveMinimum": 0, "maximum": 100},
+			"requirements":                 map[string]any{"type": "array", "maxItems": 1000, "items": requirement},
+		},
+		"additionalProperties": false,
+	}
+	source := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"id":            map[string]any{"type": "string", "minLength": 1, "maxLength": 256},
+			"platform":      map[string]any{"type": "string", "enum": platforms},
+			"name":          map[string]any{"type": "string", "minLength": 1, "maxLength": 256},
+			"category":      map[string]any{"type": "string", "minLength": 1, "maxLength": 128},
+			"enabled":       map[string]any{"type": "boolean"},
+			"lastEventAt":   map[string]any{"type": "string", "format": "date-time"},
+			"retentionDays": map[string]any{"type": "integer", "minimum": 0, "maximum": 3650},
+			"normalization": normalization,
+		},
+		"required":             []string{"id", "platform", "name", "category", "enabled", "retentionDays", "normalization"},
+		"additionalProperties": false,
+	}
+	inventory := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"apiVersion": map[string]any{"type": "string", "const": logsource.APIVersion},
+			"kind":       map[string]any{"type": "string", "const": logsource.Kind},
+			"policy":     policy,
+			"sources":    map[string]any{"type": "array", "minItems": 1, "maxItems": 10000, "items": source},
+		},
+		"required":             []string{"apiVersion", "kind", "sources"},
+		"additionalProperties": false,
+	}
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"inventory":   inventory,
+			"evaluatedAt": map[string]any{"type": "string", "format": "date-time"},
+		},
+		"required":             []string{"inventory"},
+		"additionalProperties": false,
 	}
 }
 

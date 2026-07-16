@@ -25,6 +25,11 @@ workflows, and local MCP tools. Google provider support follows in phase 4.
 - PostgreSQL schema covering organisations, immutable assessments and evidence,
   drift, findings, telemetry, detections, approvals, exceptions, and audit data.
 - CLI control validation with human, JSON, and YAML output.
+- CLI and MCP log-source compliance checks covering freshness, retention, and
+  normalisation for Sentinel/ASIM, Security Lake/OCSF, Google SecOps/UDM, and
+  Splunk/CIM.
+- A combined SIEM implementation gate using all 27 SOC-CMM 2.4.2 Basic aspect
+  results plus evidence-backed Log Management and Log Monitoring controls.
 - MCP over stdio and stateless Streamable HTTP with control catalogue tools and
   read-only Sentinel/AWS discovery and attestation plus Bicep/CloudFormation planning.
 - Official Azure and AWS SDK integrations. AWS covers Organizations, GuardDuty,
@@ -32,6 +37,9 @@ workflows, and local MCP tools. Google provider support follows in phase 4.
   OpenSearch inventory selected only by architecture.
 - Loopback-only networking by default, bounded MCP inputs and outputs, and no
   write tools in the first release slice.
+- Plan-first deployment baselines for Microsoft Sentinel (Bicep), AWS-native
+  security operations (CloudFormation), and Google Security Operations
+  (Terraform); Splunk deployment is intentionally excluded.
 
 Google discovery, remediation application, scheduling, reports, and the
 management UI are explicitly roadmap work—not mock implementations.
@@ -73,8 +81,15 @@ Native use:
 ```sh
 go build -o bin/trisoc ./cmd/trisoc
 ./bin/trisoc controls validate controls
+./bin/trisoc siem check --log-sources examples/log-source-inventory.yaml --maturity examples/soc-maturity-assessment.yaml --at 2026-07-16T08:00:00Z
 ./bin/trisoc mcp serve --transport stdio
 ```
+
+The combined check is the deployment gate: it requires compliant log-source
+coverage and normalisation as well as a complete SOC-CMM profile. See
+[log-source compliance](docs/LOG_SOURCE_COMPLIANCE.md), the
+[SOC maturity gate](docs/SOC_MATURITY.md), and the
+[deployment IaC](docs/SIEM_IAC.md).
 
 ## Read-only first scan
 

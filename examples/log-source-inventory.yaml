@@ -1,0 +1,68 @@
+apiVersion: attestor.trisoc.io/v1alpha1
+kind: LogSourceInventory
+policy:
+  minimumRetentionDays: 90
+  maximumEventAgeMinutes: 60
+  minimumNormalizationCoverage: 95
+  requirements:
+    - platform: microsoft_sentinel
+      category: authentication
+    - platform: aws_security_lake
+      category: audit
+    - platform: google_security_operations
+      category: audit
+    - platform: splunk
+      category: network
+sources:
+  - id: sentinel-signinlogs
+    platform: microsoft_sentinel
+    name: Microsoft Sentinel SigninLogs
+    category: authentication
+    enabled: true
+    retentionDays: 90
+    lastEventAt: 2026-07-16T07:55:00Z
+    normalization:
+      standard: ASIM
+      schema: Authentication
+      version: 0.1.3
+      coveragePercent: 99.2
+      validated: true
+  - id: security-lake-cloudtrail
+    platform: aws_security_lake
+    name: AWS Security Lake CloudTrail management events
+    category: audit
+    enabled: true
+    retentionDays: 365
+    lastEventAt: 2026-07-16T07:56:00Z
+    normalization:
+      standard: OCSF
+      schema: API Activity
+      version: latest
+      coveragePercent: 99.8
+      validated: true
+  - id: google-cloud-audit
+    platform: google_security_operations
+    name: Google Cloud Audit Logs
+    category: audit
+    enabled: true
+    retentionDays: 365
+    lastEventAt: 2026-07-16T07:57:00Z
+    normalization:
+      standard: UDM
+      schema: Audit and API activity
+      version: current
+      coveragePercent: 98.5
+      validated: true
+  - id: splunk-network-traffic
+    platform: splunk
+    name: Splunk network telemetry
+    category: network
+    enabled: true
+    retentionDays: 180
+    lastEventAt: 2026-07-16T07:58:00Z
+    normalization:
+      standard: CIM
+      schema: Network Traffic
+      version: "6.0"
+      coveragePercent: 99.1
+      validated: true

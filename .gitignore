@@ -4,4 +4,8 @@ bin/
 dist/
 coverage.out
 *.log
-
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example

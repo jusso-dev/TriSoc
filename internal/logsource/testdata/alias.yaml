@@ -1,0 +1,6 @@
+apiVersion: attestor.trisoc.io/v1alpha1
+kind: LogSourceInventory
+policy: &policy
+  minimumRetentionDays: 90
+sources: []
+copy: *policy
