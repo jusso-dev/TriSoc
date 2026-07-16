@@ -41,8 +41,61 @@ func TestStdioInitializeAndListTools(t *testing.T) {
 		t.Fatal(err)
 	}
 	tools := listed["result"].(map[string]any)["tools"].([]any)
-	if len(tools) != 9 {
+	if len(tools) != 11 {
 		t.Fatalf("tools=%d", len(tools))
+	}
+}
+
+func TestSOCMaturityToolFailsClosedOnIncompleteAssessment(t *testing.T) {
+	server := New(&control.Store{}, nil)
+	value, err := server.callTool(toolCall{Name: "check_soc_maturity", Arguments: json.RawMessage(`{
+		"assessment":{
+			"apiVersion":"attestor.trisoc.io/v1alpha1",
+			"kind":"SOCMaturityAssessment",
+			"metadata":{"name":"incomplete"},
+			"spec":{"model":"soc-cmm-basic@2.4.2","aspectResults":[],"controlResults":[]}
+		}
+	}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"compliant":false`) || !strings.Contains(string(raw), `"incompleteAspects":27`) || !strings.Contains(string(raw), `"incompleteControls":45`) {
+		t.Fatalf("incomplete assessment did not fail closed: %s", raw)
+	}
+}
+
+func TestLogSourceToolChecksSplunkCIM(t *testing.T) {
+	server := New(&control.Store{}, nil)
+	value, err := server.callTool(toolCall{Name: "check_log_sources", Arguments: json.RawMessage(`{
+		"evaluatedAt":"2026-07-16T08:00:00Z",
+		"inventory":{
+			"apiVersion":"attestor.trisoc.io/v1alpha1",
+			"kind":"LogSourceInventory",
+			"sources":[{
+				"id":"splunk-authentication",
+				"platform":"splunk",
+				"name":"Splunk authentication",
+				"category":"authentication",
+				"enabled":true,
+				"lastEventAt":"2026-07-16T07:55:00Z",
+				"retentionDays":90,
+				"normalization":{"standard":"CIM","schema":"Authentication","coveragePercent":100,"validated":true}
+			}]
+		}
+	}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"compliant":true`) || !strings.Contains(string(raw), `"splunk":"CIM"`) {
+		t.Fatalf("Splunk CIM check missing or failed: %s", raw)
 	}
 }
 

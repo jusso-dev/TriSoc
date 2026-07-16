@@ -1,0 +1,555 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Deployable AWS-native security operations baseline: encrypted organization
+  CloudTrail, AWS Config, GuardDuty, Security Hub CSPM, and OCSF-normalized
+  Amazon Security Lake sources. Deploy from the Organizations management or
+  delegated security administrator account, once per governed Region. Set
+  DeployOrganizationTrail to true only in the home Region stack.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: {default: Organization}
+        Parameters: [OrganizationId, OrganizationRootId, ExistingGuardDutyDetectorId]
+      - Label: {default: Retention and naming}
+        Parameters: [TrailName, DeployOrganizationTrail, ArchiveRetentionDays, SecurityLakeRetentionDays]
+
+Parameters:
+  OrganizationId:
+    Type: String
+    Description: AWS Organizations ID used in organization CloudTrail delivery paths.
+    AllowedPattern: '^o-[a-z0-9]{10,32}$'
+  OrganizationRootId:
+    Type: String
+    Description: AWS Organizations root ID to which the Security Hub central policy is attached.
+    AllowedPattern: '^r-[a-z0-9]{4,32}$'
+  ExistingGuardDutyDetectorId:
+    Type: String
+    Default: ''
+    Description: Existing regional detector ID in a delegated GuardDuty administrator account; leave empty to create one.
+    AllowedPattern: '^$|^[A-Za-z0-9_-]{1,300}$'
+  TrailName:
+    Type: String
+    Default: trisoc-organization-trail
+    AllowedPattern: '^[A-Za-z0-9._-]{3,128}$'
+  DeployOrganizationTrail:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Create the organization-wide multi-Region trail in this stack only for the designated home Region.
+  ArchiveRetentionDays:
+    Type: Number
+    Default: 365
+    MinValue: 90
+    MaxValue: 3650
+  SecurityLakeRetentionDays:
+    Type: Number
+    Default: 365
+    MinValue: 90
+    MaxValue: 3650
+
+Conditions:
+  CreateOrganizationTrail: !Equals [!Ref DeployOrganizationTrail, 'true']
+  CreateGuardDutyDetector: !Equals [!Ref ExistingGuardDutyDetectorId, '']
+
+Resources:
+  SecurityOperationsKey:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: TriSOC security telemetry encryption key
+      EnableKeyRotation: true
+      PendingWindowInDays: 30
+      MultiRegion: false
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: EnableAccountAdministration
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
+            Action: kms:*
+            Resource: '*'
+          - Sid: AllowCloudTrailEncryption
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action:
+              - kms:GenerateDataKey*
+              - kms:Decrypt
+            Resource: '*'
+            Condition:
+              StringEquals:
+                aws:SourceArn: !Sub arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/${TrailName}
+              StringLike:
+                kms:EncryptionContext:aws:cloudtrail:arn: !Sub arn:${AWS::Partition}:cloudtrail:*:${AWS::AccountId}:trail/*
+          - Sid: AllowCloudTrailDescribe
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: kms:DescribeKey
+            Resource: '*'
+            Condition:
+              StringEquals:
+                aws:SourceArn: !Sub arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/${TrailName}
+
+  SecurityOperationsKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/trisoc-security-operations
+      TargetKeyId: !Ref SecurityOperationsKey
+
+  LogArchiveBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !GetAtt SecurityOperationsKey.Arn
+      LifecycleConfiguration:
+        Rules:
+          - Id: SecurityTelemetryRetention
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: !Ref ArchiveRetentionDays
+            ExpirationInDays: !Ref ArchiveRetentionDays
+            Transitions:
+              - StorageClass: STANDARD_IA
+                TransitionInDays: 30
+              - StorageClass: GLACIER
+                TransitionInDays: 90
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: managed-by
+          Value: TriSOC
+        - Key: data-classification
+          Value: security-telemetry
+
+  LogArchiveBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref LogArchiveBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt LogArchiveBucket.Arn
+              - !Sub ${LogArchiveBucket.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+          - Sid: CloudTrailAclCheck
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource: !GetAtt LogArchiveBucket.Arn
+            Condition:
+              StringEquals:
+                aws:SourceArn: !Sub arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/${TrailName}
+          - Sid: CloudTrailOrganizationWrite
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub ${LogArchiveBucket.Arn}/AWSLogs/${OrganizationId}/*
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+                aws:SourceArn: !Sub arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/${TrailName}
+          - Sid: ConfigBucketCheck
+            Effect: Allow
+            Principal:
+              Service: config.amazonaws.com
+            Action:
+              - s3:GetBucketAcl
+              - s3:ListBucket
+            Resource: !GetAtt LogArchiveBucket.Arn
+            Condition:
+              StringEquals:
+                AWS:SourceAccount: !Ref AWS::AccountId
+          - Sid: ConfigDelivery
+            Effect: Allow
+            Principal:
+              Service: config.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub ${LogArchiveBucket.Arn}/config/AWSLogs/${AWS::AccountId}/Config/*
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+                AWS:SourceAccount: !Ref AWS::AccountId
+
+  # trivy:ignore:AVD-AWS-0015 -- KMSKeyId below resolves to this stack's rotating customer-managed key.
+  OrganizationTrail:
+    Type: AWS::CloudTrail::Trail
+    Condition: CreateOrganizationTrail
+    DependsOn: LogArchiveBucketPolicy
+    Properties:
+      TrailName: !Ref TrailName
+      S3BucketName: !Ref LogArchiveBucket
+      KMSKeyId: !GetAtt SecurityOperationsKey.Arn
+      IsLogging: true
+      IsOrganizationTrail: true
+      IsMultiRegionTrail: true
+      IncludeGlobalServiceEvents: true
+      EnableLogFileValidation: true
+      EventSelectors:
+        - IncludeManagementEvents: true
+          ReadWriteType: All
+      Tags:
+        - Key: managed-by
+          Value: TriSOC
+
+  ConfigRecorderRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: config.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWS_ConfigRole
+      Policies:
+        - PolicyName: ConfigEncryptedDelivery
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketAcl
+                  - s3:ListBucket
+                Resource: !GetAtt LogArchiveBucket.Arn
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub ${LogArchiveBucket.Arn}/config/AWSLogs/${AWS::AccountId}/Config/*
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:GenerateDataKey
+                Resource: !GetAtt SecurityOperationsKey.Arn
+
+  ConfigRecorder:
+    Type: AWS::Config::ConfigurationRecorder
+    Properties:
+      Name: default
+      RoleARN: !GetAtt ConfigRecorderRole.Arn
+      RecordingGroup:
+        AllSupported: true
+        IncludeGlobalResourceTypes: true
+      RecordingMode:
+        RecordingFrequency: CONTINUOUS
+
+  ConfigDeliveryChannel:
+    Type: AWS::Config::DeliveryChannel
+    DependsOn:
+      - ConfigRecorder
+      - LogArchiveBucketPolicy
+    Properties:
+      Name: default
+      S3BucketName: !Ref LogArchiveBucket
+      S3KeyPrefix: config
+      S3KmsKeyArn: !GetAtt SecurityOperationsKey.Arn
+      ConfigSnapshotDeliveryProperties:
+        DeliveryFrequency: Six_Hours
+
+  GuardDutyDetector:
+    Type: AWS::GuardDuty::Detector
+    Condition: CreateGuardDutyDetector
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Enable: true
+      FindingPublishingFrequency: FIFTEEN_MINUTES
+      Features:
+        - Name: S3_DATA_EVENTS
+          Status: ENABLED
+        - Name: EKS_AUDIT_LOGS
+          Status: ENABLED
+        - Name: EBS_MALWARE_PROTECTION
+          Status: ENABLED
+        - Name: RDS_LOGIN_EVENTS
+          Status: ENABLED
+        - Name: LAMBDA_NETWORK_LOGS
+          Status: ENABLED
+        - Name: RUNTIME_MONITORING
+          Status: ENABLED
+          AdditionalConfiguration:
+            - Name: EKS_ADDON_MANAGEMENT
+              Status: ENABLED
+            - Name: ECS_FARGATE_AGENT_MANAGEMENT
+              Status: ENABLED
+            - Name: EC2_AGENT_MANAGEMENT
+              Status: ENABLED
+      Tags:
+        - Key: managed-by
+          Value: TriSOC
+
+  GuardDutyOrganizationConfigurationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ConfigureGuardDutyOrganization
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: guardduty:UpdateOrganizationConfiguration
+                Resource: !Sub
+                  - arn:${AWS::Partition}:guardduty:${AWS::Region}:${AWS::AccountId}:detector/${DetectorId}
+                  - DetectorId: !If [CreateGuardDutyDetector, !Ref GuardDutyDetector, !Ref ExistingGuardDutyDetectorId]
+
+  GuardDutyOrganizationConfigurationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Applies GuardDuty and supported protection plans to existing and future organization accounts.
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt GuardDutyOrganizationConfigurationRole.Arn
+      Timeout: 120
+      ReservedConcurrentExecutions: 1
+      Code:
+        ZipFile: |
+          import json
+          import urllib.request
+          import boto3
+
+          def respond(event, context, status, message):
+              body = json.dumps({
+                  "Status": status,
+                  "Reason": message,
+                  "PhysicalResourceId": event.get("PhysicalResourceId", "trisoc-guardduty-organization"),
+                  "StackId": event["StackId"],
+                  "RequestId": event["RequestId"],
+                  "LogicalResourceId": event["LogicalResourceId"],
+              }).encode("utf-8")
+              request = urllib.request.Request(
+                  event["ResponseURL"], data=body, method="PUT",
+                  headers={"content-type": "", "content-length": str(len(body))},
+              )
+              urllib.request.urlopen(request, timeout=30).read()
+
+          def handler(event, context):
+              try:
+                  if event["RequestType"] != "Delete":
+                      boto3.client("guardduty").update_organization_configuration(
+                          DetectorId=event["ResourceProperties"]["DetectorId"],
+                          AutoEnableOrganizationMembers="ALL",
+                          Features=[
+                              {"Name": "S3_DATA_EVENTS", "AutoEnable": "ALL"},
+                              {"Name": "EKS_AUDIT_LOGS", "AutoEnable": "ALL"},
+                              {"Name": "EBS_MALWARE_PROTECTION", "AutoEnable": "ALL"},
+                              {"Name": "RDS_LOGIN_EVENTS", "AutoEnable": "ALL"},
+                              {"Name": "LAMBDA_NETWORK_LOGS", "AutoEnable": "ALL"},
+                              {
+                                  "Name": "RUNTIME_MONITORING",
+                                  "AutoEnable": "ALL",
+                                  "AdditionalConfiguration": [
+                                      {"Name": "EKS_ADDON_MANAGEMENT", "AutoEnable": "ALL"},
+                                      {"Name": "ECS_FARGATE_AGENT_MANAGEMENT", "AutoEnable": "ALL"},
+                                      {"Name": "EC2_AGENT_MANAGEMENT", "AutoEnable": "ALL"},
+                                  ],
+                              },
+                          ],
+                      )
+                  respond(event, context, "SUCCESS", "GuardDuty organization configuration applied")
+              except Exception as error:
+                  respond(event, context, "FAILED", str(error))
+
+  GuardDutyOrganizationConfiguration:
+    Type: Custom::GuardDutyOrganizationConfiguration
+    Properties:
+      ServiceToken: !GetAtt GuardDutyOrganizationConfigurationFunction.Arn
+      DetectorId: !If [CreateGuardDutyDetector, !Ref GuardDutyDetector, !Ref ExistingGuardDutyDetectorId]
+
+  SecurityHub:
+    Type: AWS::SecurityHub::Hub
+    Properties:
+      AutoEnableControls: true
+      ControlFindingGenerator: SECURITY_CONTROL
+      EnableDefaultStandards: false
+      Tags:
+        managed-by: TriSOC
+
+  SecurityHubFindingAggregator:
+    Type: AWS::SecurityHub::FindingAggregator
+    DependsOn: SecurityHub
+    Properties:
+      RegionLinkingMode: ALL_REGIONS
+
+  SecurityHubOrganizationConfiguration:
+    Type: AWS::SecurityHub::OrganizationConfiguration
+    DependsOn: SecurityHubFindingAggregator
+    Properties:
+      AutoEnable: false
+      AutoEnableStandards: NONE
+      ConfigurationType: CENTRAL
+
+  SecurityHubRecommendedPolicy:
+    Type: AWS::SecurityHub::ConfigurationPolicy
+    DependsOn: SecurityHubOrganizationConfiguration
+    Properties:
+      Name: trisoc-foundational-security-best-practices
+      Description: Enable Security Hub CSPM and every current and future AWS FSBP control across the organization.
+      ConfigurationPolicy:
+        SecurityHub:
+          ServiceEnabled: true
+          EnabledStandardIdentifiers:
+            - !Sub arn:${AWS::Partition}:securityhub:${AWS::Region}::standards/aws-foundational-security-best-practices/v/1.0.0
+          SecurityControlsConfiguration:
+            DisabledSecurityControlIdentifiers: []
+      Tags:
+        managed-by: TriSOC
+
+  SecurityHubRootPolicyAssociation:
+    Type: AWS::SecurityHub::PolicyAssociation
+    Properties:
+      ConfigurationPolicyId: !GetAtt SecurityHubRecommendedPolicy.Id
+      TargetId: !Ref OrganizationRootId
+      TargetType: ROOT
+
+  SecurityLakeMetaStoreManagerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonSecurityLakeMetastoreManager
+
+  SecurityLake:
+    Type: AWS::SecurityLake::DataLake
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      EncryptionConfiguration:
+        KmsKeyId: !GetAtt SecurityOperationsKey.Arn
+      LifecycleConfiguration:
+        Expiration:
+          Days: !Ref SecurityLakeRetentionDays
+        Transitions:
+          - Days: 30
+            StorageClass: STANDARD_IA
+          - Days: 90
+            StorageClass: GLACIER
+      MetaStoreManagerRoleArn: !GetAtt SecurityLakeMetaStoreManagerRole.Arn
+      Tags:
+        - Key: managed-by
+          Value: TriSOC
+        - Key: normalization
+          Value: OCSF
+
+  SecurityLakeCloudTrailManagement:
+    Type: AWS::SecurityLake::AwsLogSource
+    Properties:
+      DataLakeArn: !GetAtt SecurityLake.Arn
+      SourceName: CLOUD_TRAIL_MGMT
+      SourceVersion: latest
+
+  SecurityLakeLambdaExecution:
+    Type: AWS::SecurityLake::AwsLogSource
+    DependsOn: SecurityLakeCloudTrailManagement
+    Properties:
+      DataLakeArn: !GetAtt SecurityLake.Arn
+      SourceName: LAMBDA_EXECUTION
+      SourceVersion: latest
+
+  SecurityLakeS3Data:
+    Type: AWS::SecurityLake::AwsLogSource
+    DependsOn: SecurityLakeLambdaExecution
+    Properties:
+      DataLakeArn: !GetAtt SecurityLake.Arn
+      SourceName: S3_DATA
+      SourceVersion: latest
+
+  SecurityLakeEKSAudit:
+    Type: AWS::SecurityLake::AwsLogSource
+    DependsOn: SecurityLakeS3Data
+    Properties:
+      DataLakeArn: !GetAtt SecurityLake.Arn
+      SourceName: EKS_AUDIT
+      SourceVersion: latest
+
+  SecurityLakeRoute53:
+    Type: AWS::SecurityLake::AwsLogSource
+    DependsOn: SecurityLakeEKSAudit
+    Properties:
+      DataLakeArn: !GetAtt SecurityLake.Arn
+      SourceName: ROUTE53
+      SourceVersion: latest
+
+  SecurityLakeSecurityHubFindings:
+    Type: AWS::SecurityLake::AwsLogSource
+    DependsOn:
+      - SecurityLakeRoute53
+      - SecurityHubRootPolicyAssociation
+    Properties:
+      DataLakeArn: !GetAtt SecurityLake.Arn
+      SourceName: SH_FINDINGS
+      SourceVersion: latest
+
+  SecurityLakeVPCFlow:
+    Type: AWS::SecurityLake::AwsLogSource
+    DependsOn: SecurityLakeSecurityHubFindings
+    Properties:
+      DataLakeArn: !GetAtt SecurityLake.Arn
+      SourceName: VPC_FLOW
+      SourceVersion: latest
+
+  SecurityLakeWAF:
+    Type: AWS::SecurityLake::AwsLogSource
+    DependsOn: SecurityLakeVPCFlow
+    Properties:
+      DataLakeArn: !GetAtt SecurityLake.Arn
+      SourceName: WAF
+      SourceVersion: latest
+
+Outputs:
+  LogArchiveBucketName:
+    Value: !Ref LogArchiveBucket
+  KMSKeyArn:
+    Value: !GetAtt SecurityOperationsKey.Arn
+  OrganizationTrailArn:
+    Condition: CreateOrganizationTrail
+    Value: !GetAtt OrganizationTrail.Arn
+  GuardDutyDetectorId:
+    Value: !If [CreateGuardDutyDetector, !Ref GuardDutyDetector, !Ref ExistingGuardDutyDetectorId]
+  SecurityHubArn:
+    Value: !Ref SecurityHub
+  SecurityHubConfigurationPolicyArn:
+    Value: !Ref SecurityHubRecommendedPolicy
+  SecurityLakeArn:
+    Value: !GetAtt SecurityLake.Arn

@@ -22,6 +22,17 @@ and OpenSearch APIs are called only for `security_lake_with_opensearch` or
 credential field; configure those through the local AWS shared profile or
 workload identity. AWS calls have a three-minute deadline.
 
+`check_log_sources` evaluates a structured inventory for source presence,
+enablement, freshness, retention, and platform-native normalisation. It supports
+Microsoft Sentinel/ASIM, AWS Security Lake/OCSF, Google Security Operations/UDM,
+and Splunk/CIM without reading raw events or making a cloud change.
+
+`check_soc_maturity` evaluates a structured `SOCMaturityAssessment` against the
+embedded SOC-CMM 2.4.2 Basic profile. It requires all 27 aspect results,
+evidence, default maturity/capability targets, and the Log Management and Log
+Monitoring implementation controls. Missing evidence remains incomplete. The
+profile is attributed and documented in `docs/SOC_MATURITY.md`.
+
 For local HTTP:
 
 ```sh

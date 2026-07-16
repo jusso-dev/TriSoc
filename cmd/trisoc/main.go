@@ -16,6 +16,8 @@ import (
 
 	"github.com/trisoc/attestor/internal/attestation"
 	"github.com/trisoc/attestor/internal/control"
+	"github.com/trisoc/attestor/internal/logsource"
+	"github.com/trisoc/attestor/internal/maturity"
 	"github.com/trisoc/attestor/internal/mcp"
 	awsprovider "github.com/trisoc/attestor/providers/aws"
 	azureprovider "github.com/trisoc/attestor/providers/azure"
@@ -42,6 +44,12 @@ func run(args []string) error {
 		return nil
 	case "controls":
 		return controlsCommand(args[1:])
+	case "log-sources":
+		return logSourcesCommand(args[1:])
+	case "maturity":
+		return maturityCommand(args[1:])
+	case "siem":
+		return siemCommand(args[1:])
 	case "mcp":
 		return mcpCommand(args[1:])
 	case "azure":
@@ -59,6 +67,185 @@ func run(args []string) error {
 		usage()
 		return fmt.Errorf("unknown command %q", args[0])
 	}
+}
+
+func maturityCommand(args []string) error {
+	if len(args) == 0 || args[0] != "check" {
+		return errors.New("usage: trisoc maturity check ASSESSMENT [--output human|json|yaml]")
+	}
+	format := "human"
+	var path string
+	for i := 1; i < len(args); i++ {
+		switch args[i] {
+		case "--output":
+			i++
+			if i >= len(args) {
+				return errors.New("--output requires a value")
+			}
+			format = args[i]
+		default:
+			if strings.HasPrefix(args[i], "-") {
+				return fmt.Errorf("unknown option %q", args[i])
+			}
+			if path != "" {
+				return errors.New("exactly one SOC maturity assessment path is required")
+			}
+			path = args[i]
+		}
+	}
+	if path == "" {
+		return errors.New("a SOC maturity assessment path is required")
+	}
+	assessment, err := maturity.LoadFile(path)
+	if err != nil {
+		return err
+	}
+	report, err := maturity.Evaluate(assessment)
+	if err != nil {
+		return err
+	}
+	if err := printValue(report, format); err != nil {
+		return err
+	}
+	if !report.Compliant {
+		return errors.New("SOC maturity check failed")
+	}
+	return nil
+}
+
+func siemCommand(args []string) error {
+	if len(args) == 0 || args[0] != "check" {
+		return errors.New("usage: trisoc siem check --log-sources INVENTORY --maturity ASSESSMENT [--at RFC3339] [--output human|json|yaml]")
+	}
+	format := "human"
+	var inventoryPath, assessmentPath string
+	var evaluatedAt time.Time
+	for i := 1; i < len(args); i++ {
+		next := func() (string, error) {
+			i++
+			if i >= len(args) {
+				return "", fmt.Errorf("%s requires a value", args[i-1])
+			}
+			return args[i], nil
+		}
+		switch args[i] {
+		case "--log-sources":
+			value, err := next()
+			if err != nil {
+				return err
+			}
+			inventoryPath = value
+		case "--maturity":
+			value, err := next()
+			if err != nil {
+				return err
+			}
+			assessmentPath = value
+		case "--at":
+			value, err := next()
+			if err != nil {
+				return err
+			}
+			evaluatedAt, err = time.Parse(time.RFC3339, value)
+			if err != nil {
+				return fmt.Errorf("invalid --at time: %w", err)
+			}
+		case "--output":
+			value, err := next()
+			if err != nil {
+				return err
+			}
+			format = value
+		default:
+			return fmt.Errorf("unknown option %q", args[i])
+		}
+	}
+	if inventoryPath == "" || assessmentPath == "" {
+		return errors.New("--log-sources and --maturity are both required")
+	}
+	inventory, err := logsource.LoadFile(inventoryPath)
+	if err != nil {
+		return err
+	}
+	logReport, err := logsource.Evaluate(inventory, evaluatedAt)
+	if err != nil {
+		return err
+	}
+	assessment, err := maturity.LoadFile(assessmentPath)
+	if err != nil {
+		return err
+	}
+	maturityReport, err := maturity.Evaluate(assessment)
+	if err != nil {
+		return err
+	}
+	result := struct {
+		Compliant  bool             `json:"compliant" yaml:"compliant"`
+		LogSources logsource.Report `json:"logSources" yaml:"logSources"`
+		Maturity   maturity.Report  `json:"maturity" yaml:"maturity"`
+	}{Compliant: logReport.Compliant && maturityReport.Compliant, LogSources: logReport, Maturity: maturityReport}
+	if err := printValue(result, format); err != nil {
+		return err
+	}
+	if !result.Compliant {
+		return errors.New("SIEM implementation check failed")
+	}
+	return nil
+}
+
+func logSourcesCommand(args []string) error {
+	if len(args) == 0 || args[0] != "check" {
+		return errors.New("usage: trisoc log-sources check INVENTORY [--at RFC3339] [--output human|json|yaml]")
+	}
+	format := "human"
+	var evaluatedAt time.Time
+	var path string
+	for i := 1; i < len(args); i++ {
+		switch args[i] {
+		case "--output":
+			i++
+			if i >= len(args) {
+				return errors.New("--output requires a value")
+			}
+			format = args[i]
+		case "--at":
+			i++
+			if i >= len(args) {
+				return errors.New("--at requires a value")
+			}
+			parsed, err := time.Parse(time.RFC3339, args[i])
+			if err != nil {
+				return fmt.Errorf("invalid --at time: %w", err)
+			}
+			evaluatedAt = parsed
+		default:
+			if strings.HasPrefix(args[i], "-") {
+				return fmt.Errorf("unknown option %q", args[i])
+			}
+			if path != "" {
+				return errors.New("exactly one log-source inventory path is required")
+			}
+			path = args[i]
+		}
+	}
+	if path == "" {
+		return errors.New("a log-source inventory path is required")
+	}
+	inventory, err := logsource.LoadFile(path)
+	if err != nil {
+		return err
+	}
+	report, err := logsource.Evaluate(inventory, evaluatedAt)
+	if err != nil {
+		return err
+	}
+	if err := printValue(report, format); err != nil {
+		return err
+	}
+	if !report.Compliant {
+		return errors.New("log-source compliance check failed")
+	}
+	return nil
 }
 
 func controlsCommand(args []string) error {
@@ -517,6 +704,9 @@ func usage() {
 
 Usage:
   trisoc controls validate [paths...] [--output human|json|yaml]
+  trisoc log-sources check INVENTORY [--at RFC3339] [--output human|json|yaml]
+  trisoc maturity check ASSESSMENT [--output human|json|yaml]
+  trisoc siem check --log-sources INVENTORY --maturity ASSESSMENT [--at RFC3339]
   trisoc mcp serve --transport stdio
   trisoc mcp serve --transport http --listen 127.0.0.1:8787
   trisoc azure discover --subscription ID --resource-group RG --workspace NAME --output json

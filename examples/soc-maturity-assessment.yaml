@@ -1,0 +1,86 @@
+apiVersion: attestor.trisoc.io/v1alpha1
+kind: SOCMaturityAssessment
+metadata:
+  name: production-soc
+spec:
+  model: soc-cmm-basic@2.4.2
+  policy:
+    minimumMaturity: 3
+    minimumCapability: 2
+  # Copy the 27 aspect results from a completed SOC-CMM 2.4.2 Basic workbook.
+  # Technology and Services aspects also require their capability result.
+  aspectResults:
+    - {id: B.1, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#business-drivers"]}
+    - {id: B.2, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#customers-stakeholders"]}
+    - {id: B.3, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#charter"]}
+    - {id: B.4, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#governance"]}
+    - {id: B.5, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#privacy-policy"]}
+    - {id: P.1, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#employees"]}
+    - {id: P.2, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#roles-hierarchy"]}
+    - {id: P.3, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#people-management"]}
+    - {id: P.4, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#knowledge-management"]}
+    - {id: P.5, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#training-education"]}
+    - {id: M.1, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#soc-management"]}
+    - {id: M.2, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#operations-facilities"]}
+    - {id: M.3, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#reporting-communication"]}
+    - {id: M.4, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#use-case-management"]}
+    - {id: M.5, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#detection-engineering"]}
+    - {id: M.6, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#automation-engineering"]}
+    - {id: M.7, maturity: 3, evidence: ["evidence/soc-cmm-results.pdf#log-management"]}
+    - {id: T.1, maturity: 3, capability: 2, evidence: ["evidence/soc-cmm-results.pdf#log-monitoring"]}
+    - {id: T.2, maturity: 3, capability: 2, evidence: ["evidence/soc-cmm-results.pdf#network-monitoring"]}
+    - {id: T.3, maturity: 3, capability: 2, evidence: ["evidence/soc-cmm-results.pdf#endpoint-monitoring"]}
+    - {id: T.4, maturity: 3, capability: 2, evidence: ["evidence/soc-cmm-results.pdf#secops-automation"]}
+    - {id: S.1, maturity: 3, capability: 2, evidence: ["evidence/soc-cmm-results.pdf#security-monitoring"]}
+    - {id: S.2, maturity: 3, capability: 2, evidence: ["evidence/soc-cmm-results.pdf#incident-management"]}
+    - {id: S.3, maturity: 3, capability: 2, evidence: ["evidence/soc-cmm-results.pdf#analysis-forensics"]}
+    - {id: S.4, maturity: 3, capability: 2, evidence: ["evidence/soc-cmm-results.pdf#threat-intelligence"]}
+    - {id: S.5, maturity: 3, capability: 2, evidence: ["evidence/soc-cmm-results.pdf#threat-hunting"]}
+    - {id: S.6, maturity: 3, capability: 2, evidence: ["evidence/soc-cmm-results.pdf#vulnerability-management"]}
+  # Every deployment control must pass and link to reviewable evidence.
+  controlResults:
+    - {id: M.7.process, status: pass, evidence: ["evidence/log-management-process.md"]}
+    - {id: M.7.data-sources, status: pass, evidence: ["examples/log-source-inventory.yaml"]}
+    - {id: M.7.collection, status: pass, evidence: ["evidence/collection-architecture.md"]}
+    - {id: M.7.filtering, status: pass, evidence: ["evidence/log-filter-review.md"]}
+    - {id: M.7.normalisation, status: pass, evidence: ["examples/log-source-inventory.yaml"]}
+    - {id: M.7.retention, status: pass, evidence: ["examples/log-source-inventory.yaml"]}
+    - {id: M.7.backup-restore, status: pass, evidence: ["evidence/recovery-test.md"]}
+    - {id: M.7.archival, status: pass, evidence: ["evidence/log-archive-policy.md"]}
+    - {id: M.7.disposal, status: pass, evidence: ["evidence/log-disposal-policy.md"]}
+    - {id: M.7.search-analysis, status: pass, evidence: ["evidence/analyst-acceptance-test.md"]}
+    - {id: M.7.sensitive-data, status: pass, evidence: ["evidence/log-data-classification.md"]}
+    - {id: M.7.policy, status: pass, evidence: ["evidence/corporate-logging-policy.pdf"]}
+    - {id: M.7.central-platform, status: pass, evidence: ["evidence/siem-architecture.md"]}
+    - {id: M.7.compliance, status: pass, evidence: ["evidence/compliance-mapping.md"]}
+    - {id: M.7.stakeholders, status: pass, evidence: ["evidence/design-approval.md"]}
+    - {id: M.7.encryption-transit, status: pass, evidence: ["evidence/transport-security.md"]}
+    - {id: M.7.encryption-use, status: pass, evidence: ["evidence/processing-controls.md"]}
+    - {id: M.7.encryption-rest, status: pass, evidence: ["evidence/encryption-at-rest.md"]}
+    - {id: M.7.access, status: pass, evidence: ["evidence/siem-rbac-review.md"]}
+    - {id: T.1.ownership, status: pass, evidence: ["evidence/service-ownership.md"]}
+    - {id: T.1.documentation, status: pass, evidence: ["evidence/siem-runbook.md"]}
+    - {id: T.1.support, status: pass, evidence: ["evidence/support-readiness.md"]}
+    - {id: T.1.maintenance, status: pass, evidence: ["evidence/change-control.md"]}
+    - {id: T.1.high-availability, status: pass, evidence: ["evidence/resilience-test.md"]}
+    - {id: T.1.backup-replication, status: pass, evidence: ["evidence/recovery-test.md"]}
+    - {id: T.1.disaster-recovery, status: pass, evidence: ["evidence/disaster-recovery-exercise.md"]}
+    - {id: T.1.non-production, status: pass, evidence: ["evidence/non-production-validation.md"]}
+    - {id: T.1.access-review, status: pass, evidence: ["evidence/siem-rbac-review.md"]}
+    - {id: T.1.break-glass, status: pass, evidence: ["evidence/break-glass-test.md"]}
+    - {id: T.1.detection-alerting, status: pass, evidence: ["evidence/detection-acceptance-test.md"]}
+    - {id: T.1.case-management, status: pass, evidence: ["evidence/case-workflow-test.md"]}
+    - {id: T.1.audit-history, status: pass, evidence: ["evidence/audit-and-retrohunt-test.md"]}
+    - {id: T.1.architecture, status: pass, evidence: ["evidence/capacity-test.md"]}
+    - {id: T.1.mitre, status: pass, evidence: ["evidence/attack-coverage.md"]}
+    - {id: T.1.aggregation-normalisation, status: pass, evidence: ["examples/log-source-inventory.yaml"]}
+    - {id: T.1.correlation, status: pass, evidence: ["evidence/correlation-test.md"]}
+    - {id: T.1.parsing-api, status: pass, evidence: ["evidence/parser-api-test.md"]}
+    - {id: T.1.secure-transport, status: pass, evidence: ["evidence/transport-security.md"]}
+    - {id: T.1.context-integrations, status: pass, evidence: ["evidence/context-integrations.md"]}
+    - {id: T.1.workflow-integrations, status: pass, evidence: ["evidence/workflow-integrations.md"]}
+    - {id: T.1.rules, status: pass, evidence: ["evidence/rule-governance.md"]}
+    - {id: T.1.anomaly, status: pass, evidence: ["evidence/anomaly-test.md"]}
+    - {id: T.1.reporting, status: pass, evidence: ["evidence/reporting-acceptance.md"]}
+    - {id: T.1.visualisation, status: pass, evidence: ["evidence/analyst-acceptance-test.md"]}
+    - {id: T.1.search-console, status: pass, evidence: ["evidence/search-acceptance-test.md"]}

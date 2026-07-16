@@ -1,0 +1,134 @@
+{
+  "id": "soc-cmm-basic",
+  "version": "2.4.2",
+  "title": "SOC-CMM 2.4.2 Basic SIEM implementation profile",
+  "published": "2026-04-16",
+  "source": "https://www.soc-cmm.com/",
+  "author": "Rob van Os",
+  "license": "CC-BY-SA-4.0",
+  "adaptationNotice": "Adapted for TriSOC from SOC-CMM 2.4.2 Basic. The workbook remains the authoritative questionnaire; this profile records its 27 aspect results and adds a deterministic deployment gate for the Log Management and Log Monitoring content. Missing responses or evidence are treated as incomplete.",
+  "defaults": {
+    "minimumMaturity": 3,
+    "minimumCapability": 2
+  },
+  "maturityLevels": [
+    {"value": 0, "name": "Non-existent"},
+    {"value": 1, "name": "Initial"},
+    {"value": 2, "name": "Managed"},
+    {"value": 3, "name": "Defined"},
+    {"value": 4, "name": "Quantitatively managed"},
+    {"value": 5, "name": "Optimizing"}
+  ],
+  "capabilityLevels": [
+    {"value": 0, "name": "Incomplete"},
+    {"value": 1, "name": "Performed"},
+    {"value": 2, "name": "Managed"},
+    {"value": 3, "name": "Defined"}
+  ],
+  "domains": [
+    {
+      "id": "B",
+      "name": "Business",
+      "aspects": [
+        {"id": "B.1", "name": "Business Drivers", "capabilityApplicable": false},
+        {"id": "B.2", "name": "Customers & Stakeholders", "capabilityApplicable": false},
+        {"id": "B.3", "name": "Charter", "capabilityApplicable": false},
+        {"id": "B.4", "name": "Governance", "capabilityApplicable": false},
+        {"id": "B.5", "name": "Privacy & Policy", "capabilityApplicable": false}
+      ]
+    },
+    {
+      "id": "P",
+      "name": "People",
+      "aspects": [
+        {"id": "P.1", "name": "Employees", "capabilityApplicable": false},
+        {"id": "P.2", "name": "Roles and Hierarchy", "capabilityApplicable": false},
+        {"id": "P.3", "name": "People Management", "capabilityApplicable": false},
+        {"id": "P.4", "name": "Knowledge Management", "capabilityApplicable": false},
+        {"id": "P.5", "name": "Training & Education", "capabilityApplicable": false}
+      ]
+    },
+    {
+      "id": "M",
+      "name": "Process",
+      "aspects": [
+        {"id": "M.1", "name": "SOC Management", "capabilityApplicable": false},
+        {"id": "M.2", "name": "Operations and Facilities", "capabilityApplicable": false},
+        {"id": "M.3", "name": "Reporting & Communication", "capabilityApplicable": false},
+        {"id": "M.4", "name": "Use Case Management", "capabilityApplicable": false},
+        {"id": "M.5", "name": "Detection Engineering & Validation", "capabilityApplicable": false},
+        {"id": "M.6", "name": "Automation Engineering", "capabilityApplicable": false},
+        {"id": "M.7", "name": "Log Management", "capabilityApplicable": false}
+      ]
+    },
+    {
+      "id": "T",
+      "name": "Technology",
+      "aspects": [
+        {"id": "T.1", "name": "Log Monitoring", "capabilityApplicable": true},
+        {"id": "T.2", "name": "Network Monitoring", "capabilityApplicable": true},
+        {"id": "T.3", "name": "Endpoint Monitoring", "capabilityApplicable": true},
+        {"id": "T.4", "name": "SecOps Automation", "capabilityApplicable": true}
+      ]
+    },
+    {
+      "id": "S",
+      "name": "Services",
+      "aspects": [
+        {"id": "S.1", "name": "Security Monitoring", "capabilityApplicable": true},
+        {"id": "S.2", "name": "Security Incident Management", "capabilityApplicable": true},
+        {"id": "S.3", "name": "Security Analysis and Forensics", "capabilityApplicable": true},
+        {"id": "S.4", "name": "Threat Intelligence", "capabilityApplicable": true},
+        {"id": "S.5", "name": "Threat Hunting", "capabilityApplicable": true},
+        {"id": "S.6", "name": "Vulnerability Management", "capabilityApplicable": true}
+      ]
+    }
+  ],
+  "siemImplementationControls": [
+    {"id": "M.7.process", "aspectId": "M.7", "name": "Documented log-management process", "description": "A defined and maintained log-management process exists."},
+    {"id": "M.7.data-sources", "aspectId": "M.7", "name": "Log-source inventory", "description": "Required data sources and owners are identified and documented."},
+    {"id": "M.7.collection", "aspectId": "M.7", "name": "Collection design", "description": "Collection paths, agents, APIs, failure handling, and health monitoring are defined."},
+    {"id": "M.7.filtering", "aspectId": "M.7", "name": "Filtering policy", "description": "Intentional filtering is documented, reviewed, and does not remove required security evidence."},
+    {"id": "M.7.normalisation", "aspectId": "M.7", "name": "Normalisation policy", "description": "Events are mapped to the platform-native security schema and mapping quality is validated."},
+    {"id": "M.7.retention", "aspectId": "M.7", "name": "Retention policy", "description": "Retention is risk-based, compliant with obligations, and enforced by the platform."},
+    {"id": "M.7.backup-restore", "aspectId": "M.7", "name": "Backup and restore", "description": "Backup and restoration requirements are documented and tested where applicable."},
+    {"id": "M.7.archival", "aspectId": "M.7", "name": "Archival", "description": "Long-term archival requirements, integrity, access, and retrieval are defined."},
+    {"id": "M.7.disposal", "aspectId": "M.7", "name": "Secure disposal", "description": "Logs are disposed of according to policy after retention obligations are met."},
+    {"id": "M.7.search-analysis", "aspectId": "M.7", "name": "Search and analysis", "description": "Authorised analysts can reliably search, correlate, and analyse retained telemetry."},
+    {"id": "M.7.sensitive-data", "aspectId": "M.7", "name": "Sensitive-data handling", "description": "Personal, secret, regulated, and other sensitive values are minimised and protected."},
+    {"id": "M.7.policy", "aspectId": "M.7", "name": "Corporate logging policy", "description": "The log-management process is backed by an approved organisational policy."},
+    {"id": "M.7.central-platform", "aspectId": "M.7", "name": "Central log platform", "description": "Security-relevant telemetry is centrally managed in the SIEM or an integrated log platform."},
+    {"id": "M.7.compliance", "aspectId": "M.7", "name": "Standards and regulatory alignment", "description": "Logging design maps to applicable standards, contractual duties, and regulations."},
+    {"id": "M.7.stakeholders", "aspectId": "M.7", "name": "Stakeholder alignment", "description": "Security, privacy, legal, operations, and system owners approve relevant logging requirements."},
+    {"id": "M.7.encryption-transit", "aspectId": "M.7", "name": "Encryption in transit", "description": "Log transport is authenticated and encrypted."},
+    {"id": "M.7.encryption-use", "aspectId": "M.7", "name": "Protection in use", "description": "Access paths and processing environments protect log data while it is being used."},
+    {"id": "M.7.encryption-rest", "aspectId": "M.7", "name": "Encryption at rest", "description": "Stored logs, archives, and backups are encrypted with governed keys."},
+    {"id": "M.7.access", "aspectId": "M.7", "name": "Restricted access", "description": "Least privilege, separation of duties, and reviewable access protect log data."},
+    {"id": "T.1.ownership", "aspectId": "T.1", "name": "Platform ownership", "description": "Accountable service and technical owners are assigned to the log-monitoring platform."},
+    {"id": "T.1.documentation", "aspectId": "T.1", "name": "Platform documentation", "description": "Architecture, configuration, integrations, operating procedures, and recovery are documented."},
+    {"id": "T.1.support", "aspectId": "T.1", "name": "Support readiness", "description": "Administrators and analysts are trained and an appropriate support arrangement exists."},
+    {"id": "T.1.maintenance", "aspectId": "T.1", "name": "Maintenance and change control", "description": "Updates, trusted tooling, maintenance windows, and changes are governed and tested."},
+    {"id": "T.1.high-availability", "aspectId": "T.1", "name": "High availability", "description": "The architecture eliminates unacceptable single points of failure and monitors service health."},
+    {"id": "T.1.backup-replication", "aspectId": "T.1", "name": "Backup and replication", "description": "Configuration and required data are backed up or replicated consistent with recovery objectives."},
+    {"id": "T.1.disaster-recovery", "aspectId": "T.1", "name": "Disaster recovery", "description": "Recovery objectives and procedures are implemented and exercised."},
+    {"id": "T.1.non-production", "aspectId": "T.1", "name": "Non-production validation", "description": "Material changes, parsers, and detections can be validated outside production."},
+    {"id": "T.1.access-review", "aspectId": "T.1", "name": "Access review", "description": "Privileged and analyst access is least-privileged, logged, and periodically reviewed."},
+    {"id": "T.1.break-glass", "aspectId": "T.1", "name": "Emergency access", "description": "Break-glass access is protected, monitored, time-bounded, and tested."},
+    {"id": "T.1.detection-alerting", "aspectId": "T.1", "name": "Detection and alerting", "description": "The platform detects subtle security events and creates actionable alerts automatically."},
+    {"id": "T.1.case-management", "aspectId": "T.1", "name": "Acknowledgement and case management", "description": "Alerts can be acknowledged, assigned, tracked, and linked to incident workflows."},
+    {"id": "T.1.audit-history", "aspectId": "T.1", "name": "Analyst audit trail and historical detection", "description": "Analyst activity is auditable and historical telemetry can be re-evaluated for new detections."},
+    {"id": "T.1.architecture", "aspectId": "T.1", "name": "Flexible scalable architecture", "description": "Capacity, performance, integrations, and growth are engineered and monitored."},
+    {"id": "T.1.mitre", "aspectId": "T.1", "name": "MITRE ATT&CK mapping", "description": "Detection and investigation content can be tagged and reported against ATT&CK."},
+    {"id": "T.1.aggregation-normalisation", "aspectId": "T.1", "name": "Aggregation and normalisation", "description": "Multiple event sources are aggregated and normalised into platform-native schemas."},
+    {"id": "T.1.correlation", "aspectId": "T.1", "name": "Correlation", "description": "The platform supports cross-source and multi-stage correlation."},
+    {"id": "T.1.parsing-api", "aspectId": "T.1", "name": "Custom parsing and APIs", "description": "Custom parsers and governed APIs support sources that lack native integrations."},
+    {"id": "T.1.secure-transport", "aspectId": "T.1", "name": "Secure transport options", "description": "Multiple supported transport methods provide authenticated and encrypted ingestion."},
+    {"id": "T.1.context-integrations", "aspectId": "T.1", "name": "Context integrations", "description": "The SIEM integrates asset, business, identity, vulnerability, and threat-intelligence context."},
+    {"id": "T.1.workflow-integrations", "aspectId": "T.1", "name": "Security workflow integrations", "description": "Threat hunting, incident response, forensics, and automation workflows interoperate with the SIEM."},
+    {"id": "T.1.rules", "aspectId": "T.1", "name": "Standard and custom rules", "description": "Reviewed standard content and organisation-specific rules are supported and governed."},
+    {"id": "T.1.anomaly", "aspectId": "T.1", "name": "Anomaly detection", "description": "User, application, device, and network anomalies can be detected and investigated."},
+    {"id": "T.1.reporting", "aspectId": "T.1", "name": "Reporting and dashboards", "description": "Operational, risk, compliance, and detection-health reporting is available."},
+    {"id": "T.1.visualisation", "aspectId": "T.1", "name": "Visualisation and drill-down", "description": "Analysts can move from summaries to the underlying evidence without losing context."},
+    {"id": "T.1.search-console", "aspectId": "T.1", "name": "Central console and advanced search", "description": "A central analyst experience provides powerful, governed search across retained telemetry."}
+  ]
+}

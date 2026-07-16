@@ -1,0 +1,5 @@
+apiVersion: attestor.trisoc.io/v1alpha1
+kind: LogSourceInventory
+policy: {}
+sources: []
+unexpected: true

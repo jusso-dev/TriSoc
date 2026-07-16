@@ -29,11 +29,37 @@ jobs:
         run: go vet ./...
       - name: Validate bundled controls
         run: go run ./cmd/trisoc controls validate controls --output json
+      - name: Validate combined SIEM implementation gate
+        run: |
+          go run ./cmd/trisoc siem check \
+            --log-sources examples/log-source-inventory.yaml \
+            --maturity examples/soc-maturity-assessment.yaml \
+            --at 2026-07-16T08:00:00Z \
+            --output json
       - name: Validate AWS CloudFormation
         run: |
-          pipx install cfn-lint==1.46.0
+          pipx install cfn-lint==1.53.0
           go run ./cmd/trisoc aws plan --trail-name trisoc-organization-trail --output cloudformation > generated-aws-plan.json
-          cfn-lint deploy/cloudformation/aws-attestor-assessment-role.yaml generated-aws-plan.json
+          cfn-lint \
+            deploy/cloudformation/aws-attestor-assessment-role.yaml \
+            deploy/cloudformation/aws-security-operations-baseline.yaml \
+            generated-aws-plan.json
+      - name: Validate Microsoft Sentinel Bicep
+        run: az bicep build --file deploy/bicep/microsoft-sentinel/main.bicep --outfile /tmp/trisoc-microsoft-sentinel.json
+      - name: Validate Google Security Operations Terraform
+        run: |
+          docker run --rm \
+            --volume "$PWD/deploy/terraform/google-secops:/workspace" \
+            --workdir /workspace \
+            hashicorp/terraform:1.15.8 fmt -check
+          docker run --rm \
+            --volume "$PWD/deploy/terraform/google-secops:/workspace" \
+            --workdir /workspace \
+            hashicorp/terraform:1.15.8 init -backend=false -lockfile=readonly
+          docker run --rm \
+            --volume "$PWD/deploy/terraform/google-secops:/workspace" \
+            --workdir /workspace \
+            hashicorp/terraform:1.15.8 validate
       - name: Validate Compose
         run: docker compose config --quiet
       - name: Build container
