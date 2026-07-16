@@ -4,11 +4,13 @@ TriSOC Attestor builds, validates and continuously attests Microsoft Sentinel,
 AWS-native security operations, and Google Security Operations environments
 against reviewed vendor guidance.
 
-The foundation, Microsoft Sentinel provider, and AWS-native security operations
-provider are implemented: strict versioned controls, canonical PostgreSQL schema,
-redacted evidence hashing, real vendor SDK-backed read-only discovery,
-deterministic attestation, drift comparison, reviewable IaC planning, CLI
-workflows, and local MCP tools. Google provider support follows in phase 4.
+The foundation, Microsoft Sentinel provider, AWS-native security operations
+provider, cross-platform SIEM readiness gates, and deployment baselines are
+implemented: strict versioned controls and inputs, redacted evidence hashing,
+vendor SDK-backed read-only discovery, deterministic attestation, SOC-CMM
+maturity assessment, log-source normalisation checks, reviewable IaC, CLI
+workflows, and local MCP tools. Google provider discovery follows in phase 4;
+its deployable Terraform baseline is available now.
 
 > TriSOC Attestor assists with deployment and continuous attestation. It does
 > not guarantee security, replace incident response, or replace qualified cloud
@@ -47,19 +49,74 @@ management UI are explicitly roadmap work—not mock implementations.
 ## Architecture
 
 ```mermaid
-flowchart LR
-  Agent[CLI or MCP client] --> Core[Go control and attestation core]
-  Web[Next.js management UI - planned] --> API[Go REST API - planned]
-  API --> Core
-  Scheduler[Worker and scheduler - planned] --> Core
-  Core --> AZ[Microsoft collectors - phase 2]
-  Core --> AWS[AWS collectors - phase 3 complete]
-  Core --> GCP[Google collectors - phase 4]
-  Core --> DB[(PostgreSQL append-only evidence)]
-  Core --> Plans[Reviewable IaC plans]
+flowchart TB
+  subgraph Entry[Entry points]
+    Operator[Operator] --> CLI[TriSOC CLI]
+    Agent[Approved agent] --> MCP[Read-only MCP server]
+  end
+
+  subgraph Readiness[SIEM readiness services]
+    SIEMCommand[trisoc siem check]
+    CheckTools[check_log_sources and check_soc_maturity]
+    Inventory[LogSourceInventory] --> LogCheck[Log-source compliance and normalisation]
+    Profile[SOC-CMM assessment] --> MaturityCheck[SOC maturity and evidence]
+    Gate[Combined SIEM implementation gate]
+    SIEMCommand --> Gate
+    CheckTools --> LogCheck
+    CheckTools --> MaturityCheck
+    LogCheck --> Gate
+    MaturityCheck --> Gate
+  end
+
+  CLI --> SIEMCommand
+  MCP --> CheckTools
+
+  subgraph ProviderFlow[Read-only provider attestation]
+    ProviderTools[discover and attest tools] --> Attestation[Provider discovery and attestation]
+    Catalogue[Versioned controls] --> Attestation
+    Attestation --> Results[Bounded findings and evidence references]
+  end
+
+  CLI --> ProviderTools
+  MCP --> ProviderTools
+
+  subgraph Deployment[Deployment and onboarding]
+    IaC[Bicep, CloudFormation, Terraform] --> Managed[Sentinel, AWS, Google SecOps]
+    Splunk[Splunk - checks only]
+  end
+  Managed -->|onboarded source evidence| Inventory
+  Splunk -->|CIM source evidence| Inventory
+  Managed --> Attestation
+
+  Gate --> Decision[Deployment readiness decision]
+  Results -. phase 5 persistence .-> DB[(Append-only PostgreSQL schema)]
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) and the [architecture decisions](docs/adr/README.md).
+
+## Readiness, attestation, and deployment tools
+
+| Workflow | CLI | MCP | Result |
+| --- | --- | --- | --- |
+| Validate controls | `trisoc controls validate` | `validate_control_bundle` | Strict metadata, source, lifecycle, and CEL validation |
+| Check log sources | `trisoc log-sources check` | `check_log_sources` | Coverage, enablement, freshness, retention, and native normalisation |
+| Check SOC maturity | `trisoc maturity check` | `check_soc_maturity` | SOC-CMM 2.4.2 Basic scores, evidence, and 45 SIEM implementation controls |
+| Make a deployment decision | `trisoc siem check` | Run both check tools | Passes only when log-source and maturity reports both pass |
+| Assess Microsoft Sentinel | `trisoc azure discover` / `attest` | `discover_microsoft_sentinel` / `run_microsoft_sentinel_attestation` | Read-only workspace observations and deterministic control results |
+| Assess AWS security operations | `trisoc aws discover` / `attest` | `discover_aws_security_operations` / `run_aws_security_operations_attestation` | Read-only organisation and regional observations and control results |
+
+Deployment assets and their expected normalisation are:
+
+| Platform | Normalisation check | Deployment baseline | Provider attestation |
+| --- | --- | --- | --- |
+| Microsoft Sentinel | ASIM | Bicep | Available |
+| AWS Security Lake | OCSF | CloudFormation | Available |
+| Google Security Operations | UDM | Terraform | Planned phase 4 |
+| Splunk | CIM | Intentionally excluded | Log-source check only |
+
+The deployment baselines establish secure starting configurations; the combined
+gate is still required after telemetry onboarding. See the
+[implementation lifecycle](ARCHITECTURE.md#siem-implementation-lifecycle).
 
 ## Five-minute local setup
 
