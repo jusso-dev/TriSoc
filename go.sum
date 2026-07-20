@@ -42,8 +42,8 @@ github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.57.1 h1:5XlIVn2Z60K3GkDz/Ktjt
 github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.57.1/go.mod h1:WbDasAgg1UxPx3TjF9wsbDKCXTcI4jsB5synkB8CCB8=
 github.com/aws/aws-sdk-go-v2/service/configservice v1.67.1 h1:ezQdIhoXelYqFcOmi6sEcpySonMwWES+uEEAnA8AdAE=
 github.com/aws/aws-sdk-go-v2/service/configservice v1.67.1/go.mod h1:uLtMQIAG1/lzhORRBDFT44lFL2QuGh9rWO3oMru+OW0=
-github.com/aws/aws-sdk-go-v2/service/guardduty v1.83.0 h1:wN1QaNY0KMd6B3f/9LHXc7MHoZUMynTtfiKvfXBd/Ro=
-github.com/aws/aws-sdk-go-v2/service/guardduty v1.83.0/go.mod h1:5ALcyuLJ7PWhKGfymTQuzcnElk/7CDiTjIv/Hp6YyGc=
+github.com/aws/aws-sdk-go-v2/service/guardduty v1.83.1 h1:apr/aWt6cPDT+q3JF7esmSm8jgMDxWlFjOkFJIT1iCU=
+github.com/aws/aws-sdk-go-v2/service/guardduty v1.83.1/go.mod h1:5ALcyuLJ7PWhKGfymTQuzcnElk/7CDiTjIv/Hp6YyGc=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.13 h1:mbRIur/BiHK6SKPjoBIXSE/hJ6g6JGRLuxQy1jGjlN4=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.13/go.mod h1:ITg9em2KbJx1s0y4aqRX5OYWG6HBZ5TVR//OdpEZ2CQ=
 github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.30 h1:/Z5jmNrKsSD7EmDjzAPsm/3L9IuOkzaynklJZ1qX7S4=
@@ -52,8 +52,8 @@ github.com/aws/aws-sdk-go-v2/service/opensearch v1.74.1 h1:DOJ0btsXfeKiAOVMA/rDn
 github.com/aws/aws-sdk-go-v2/service/opensearch v1.74.1/go.mod h1:ESVhnGt6gZMcitF7aXN5/nTNZfGSy61QV+B0ovHEDxc=
 github.com/aws/aws-sdk-go-v2/service/organizations v1.52.1 h1:FYLkiPCZw0a1foyrXxgAps3vZM3QfOkE20GnKo5Thto=
 github.com/aws/aws-sdk-go-v2/service/organizations v1.52.1/go.mod h1:2ibX1FoyhvTXbIR4TP/Vf6BB6Tc3YW9jWbvNflSOcUM=
-github.com/aws/aws-sdk-go-v2/service/securityhub v1.73.1 h1:xslLxOtlIkP40WgNhmVCmmKJGWtKjEDoGLSaA2XxOks=
-github.com/aws/aws-sdk-go-v2/service/securityhub v1.73.1/go.mod h1:GF8lzLRPcdCQ0OYuHVN0UsjFFymEF5zWBvMZz5JtDPw=
+github.com/aws/aws-sdk-go-v2/service/securityhub v1.74.0 h1:jRSeE3HZKFgeejfPjFWoWTEeN9ng7QbJfDsNwEk17W4=
+github.com/aws/aws-sdk-go-v2/service/securityhub v1.74.0/go.mod h1:GF8lzLRPcdCQ0OYuHVN0UsjFFymEF5zWBvMZz5JtDPw=
 github.com/aws/aws-sdk-go-v2/service/securitylake v1.27.1 h1:ozuG7onAunMUhQvBksDjXRk0eqSN/RR/Rvf+6DdT7Ws=
 github.com/aws/aws-sdk-go-v2/service/securitylake v1.27.1/go.mod h1:cXSURuSeMFJvmi21GTPDXKlpmpS6JHbWID6bgbYMmiI=
 github.com/aws/aws-sdk-go-v2/service/signin v1.4.1 h1:V7ZZ300WPXGjvkyore5DGe0ljVPOxCXie/thWdtSBXE=
